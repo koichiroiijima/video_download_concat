@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.mp4
+*.part
+*_segments/
+list.txt
+build/
+dist/
+vendor/ffmpeg/
+.pytest_cache/
+.coverage
+htmlcov/
+/video-concat.ini
+/ffmpeg
+/ffmpeg.exe

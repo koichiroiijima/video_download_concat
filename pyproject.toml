@@ -1,0 +1,26 @@
+[project]
+name = "video-download-concat"
+version = "0.1.0"
+description = "m3u8 (HLS) のセグメントをダウンロードし、ffmpeg で 1 本の MP4 に結合する CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+video-concat = "video_concat.cli:main"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.11",
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/video_concat"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

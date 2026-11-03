@@ -1,0 +1,16 @@
+FFmpeg ライセンス情報
+=====================
+
+本プログラムは ffmpeg を外部プログラムとして呼び出します。
+同梱・自動ダウンロードする ffmpeg は BtbN/FFmpeg-Builds が配布する
+LGPL 静的ビルドです。
+
+- FFmpeg 公式サイト: https://ffmpeg.org/
+- ライセンス: https://ffmpeg.org/legal.html
+- 配布元: https://github.com/BtbN/FFmpeg-Builds
+
+同梱する ffmpeg の正確なバージョン、取得元 URL、SHA256 は
+FFMPEG-BUILD-INFO.txt に記載しています。
+
+LGPL の全文は FFmpeg-LGPL-2.1.txt を参照してください。
+ソースコードの入手先は上記の配布元および FFmpeg 公式サイトを参照してください。

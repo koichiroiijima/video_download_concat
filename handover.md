@@ -1,0 +1,157 @@
+# 引き継ぎ (handover)
+
+次のセッション / モデルが最初に読むためのエントリポイントです。
+まず本ファイルを読み、必要に応じて下記へ進んでください。
+
+## 1. 最初に読む順番
+
+1. 本ファイル (`handover.md`) — 現状と次の作業
+2. [AGENTS.md](AGENTS.md) — 作業規約・コマンド・Git 方針
+3. [docs/design.md](docs/design.md) — 実装とデータフロー
+4. [docs/details.md](docs/details.md) — 外部仕様・設定・テスト
+5. [docs/build.md](docs/build.md) — ビルドと配布
+6. [README.md](README.md) — 利用者向け操作
+
+## 2. プロジェクトの現状
+
+`list.cmd` が手動で行っていた m3u8 セグメントの取得・結合を Python CLI に置き換え、
+Python 不要の配布版（PyInstaller onedir）を追加した。
+
+| 領域 | 状態 |
+| --- | --- |
+| プロジェクト初期化（git / `.gitignore` / `.venv`） | 完了 |
+| m3u8 パーサー（マスター / メディア） | 実装済み |
+| セグメント並列ダウンロード（リトライ / 再開 / 進捗） | 実装済み |
+| ffmpeg concat 結合 | 実装済み |
+| `EXT-X-TOKEN`（クエリ / ヘッダ） | 実装済み |
+| 設定ファイル（Referer ほか） | 実装済み |
+| ffmpeg の同梱探索・初回自動ダウンロード | 実装済み |
+| PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
+| Linux 配布版のビルド・E2E | 確認済み |
+| Windows 11 配布版のビルド・E2E | **未確認（Windows 実機が必要）** |
+| 自動テスト | 36 passed |
+| AES-128 / fMP4 / BYTERANGE | 未対応（明示エラー） |
+
+## 3. 現在の実行状態
+
+常駐プロセスはありません。
+
+```bash
+uv sync
+uv run pytest
+uv run video-concat --help
+```
+
+Linux 配布版のビルド:
+
+```bash
+./packaging/build.sh
+# または ffmpeg を取得して同梱
+./packaging/build.sh --fetch-ffmpeg
+```
+
+Windows 11 では PowerShell から:
+
+```powershell
+.\packaging\build.ps1
+# ffmpeg を取得して同梱する場合
+.\packaging\build.ps1 -FetchFfmpeg
+```
+
+## 4. 検証コマンド
+
+```bash
+uv sync
+uv run pytest
+uv run video-concat --help
+uv run python -m video_concat --help
+uv run python -m compileall -q src packaging tests
+```
+
+パーサーのスモークテスト:
+
+```bash
+uv run python - <<'PY'
+from pathlib import Path
+from video_concat.m3u8 import parse_playlist
+
+text = Path("video.m3u8").read_text(encoding="utf-8")
+playlist = parse_playlist(text, Path("video.m3u8").resolve().as_uri())
+print("segments:", len(playlist.segments))
+print("first:", playlist.segments[0].uri)
+print("last:", playlist.segments[-1].uri)
+print("tokens:", len(playlist.tokens))
+PY
+```
+
+E2E テスト用 ffmpeg:
+
+```bash
+uv run python packaging/fetch_ffmpeg.py
+# vendor/ffmpeg/linux-x86_64/ffmpeg ができる
+uv run pytest tests/test_e2e.py -q
+```
+
+## 5. 直近の変更履歴
+
+- 2026-11-03: 初版実装。
+  - `src/video_concat/`（cli / m3u8 / net / downloader / ffmpeg）
+  - `pyproject.toml`（uv + hatchling、`video-concat` コマンド）
+  - README / docs / AGENTS / opencode.json
+- 2026-11-03: 配布版対応。
+  - `config.py` — `video-concat.ini` の読み込み、Referer ほか。
+  - `headers.py` — ヘッダ解析・検証。
+  - `ffmpeg_bootstrap.py` — 同梱 ffmpeg の探索、初回自動ダウンロード。
+  - `ffmpeg_sources.py` — LGPL 静的ビルドの URL・SHA256。
+  - `packaging/` — PyInstaller ビルド、Windows / Linux スクリプト、設定例、ライセンス。
+  - `tests/` — 設定、ヘッダ、ffmpeg 探索、E2E。
+  - `docs/build.md` — ビルド・配布手順。
+- 動作確認:
+  - `uv run pytest` → 36 passed。
+  - Linux 配布版をビルドし、`--help` と引数なしヘルプを確認。
+  - 配布版で exe 隣の `video-concat.ini` を読み、Referer が m3u8 と各セグメントに送られることを確認。
+  - `ffmpeg` を削除した配布版で自動ダウンロード → 結合まで確認。
+  - 読み取り専用フォルダで「書き込み権限がありません」エラーになることを確認。
+  - `video.m3u8` から 1830 セグメントを解析できることを確認。
+
+## 6. 既知の制約・注意点
+
+- **Windows 11 の配布版は未ビルド・未検証**。Linux から Windows 用 exe は作れない。
+  Windows 11 実機で `.\packaging\build.ps1` を実行し、docs/build.md のチェックリストを実施する。
+- 自動ダウンロードは **配布版のみ**。ソース実行では `--ffmpeg` または `PATH` が必要。
+- exe と同じフォルダに書き込めない場合、自動ダウンロードはエラーになる。
+  ユーザーデータ領域へのフォールバックはしない方針。
+- 自動ダウンロードする ffmpeg は LGPL 静的ビルド（FFmpeg 8.1.3）。
+  `ffmpeg_sources.py` の URL・SHA256 を更新したらライセンス情報も更新する。
+- `video.m3u8` は途中で `#EXT-X-ENDLIST` が重複し、`4000,` という壊れた行と、
+  `video1757`〜`video1759` の欠番、`EXTINF` のない `video1760` を含む。
+  パーサーはこれを警告しつつ 1830 セグメントとして扱う。
+- このサンプルの `video1760` は、直前の `EXT-X-TOKEN`（1 個目）が適用される。
+  元のプレイリストが壊れているため、トークンの対応は保証できない。
+- `EXT-X-TOKEN` の正しい使い方（クエリ / ヘッダ / Cookie）は配信元によって異なる。
+  実データで確認するまでは `--token-query` / `--token-header` を指定して検証すること。
+- ライブ配信は実行時点のスナップショットのみ。
+- セグメント URL にトークンが含まれる場合、`-v` のログに URL が出る可能性がある。
+- 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。
+- `list.cmd` は 4 桁ゼロ埋めのため 10,000 セグメント以上では破綻するが、
+  本ツールはプレイリスト順を使うため影響しない。
+
+## 7. 次にやるとよさそうな作業 (候補)
+
+- [ ] Windows 11 実機で `build.ps1` を実行し、配布版の E2E を確認する。
+- [ ] Windows でスペース・日本語を含むパスの E2E を確認する。
+- [ ] 実 URL で Referer 必須の配信元に対して E2E を確認する。
+- [ ] 必要ならコード署名（SmartScreen 対策）を検討する。
+- [ ] パーサー（マスター / 壊れた行 / トークン）のテストを追加する。
+- [ ] `EXT-X-TOKEN` の実際の付与方法を確認し、必要なら Cookie 対応を追加する。
+- [ ] AES-128 暗号化 HLS に対応するか判断する（`cryptography` などの依存追加）。
+- [ ] fMP4（`EXT-X-MAP`）対応が必要か判断する。
+- [ ] ライブ配信の継続取得（ポーリング）が必要か判断する。
+
+## 8. 作業を始める前に
+
+- 表示テキストは日本語（[AGENTS.md](AGENTS.md) の言語ポリシー）。
+- コミットはタスク完了後に Conventional Commits 日本語で実行。push / ブランチ操作は要確認。
+- 既存のスタイルに合わせる。
+- `.venv/`、`*.mp4`、`*_segments/`、`list.txt`、`build/`、`dist/`、`vendor/ffmpeg/` はコミットしない。
+- `packaging/LICENSES/` と `packaging/video-concat.ini` は配布物に必要なのでコミットする。
