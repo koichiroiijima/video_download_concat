@@ -14,3 +14,4 @@ htmlcov/
 /video-concat.ini
 /ffmpeg
 /ffmpeg.exe
+tools/mock-hls-server/media/

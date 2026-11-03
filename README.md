@@ -7,7 +7,8 @@ ffmpeg の concat デマルチプレクサで 1 本の MP4 に結合する CLI �
 ffmpeg 結合、セグメント削除」をまとめて自動化します。
 
 配布版は **Python のインストール不要**のフォルダ型実行ファイルです。
-Windows 11 と Linux（x86_64）で動作します。
+Windows 11 と Linux（x86_64）向けの配布版を用意しています
+（Windows 11 実機での検証は未実施です）。
 
 ## 1. 配布版の使い方
 
@@ -16,7 +17,7 @@ Windows 11 と Linux（x86_64）で動作します。
 ```text
 video-concat-windows-x86_64/
 ├── video-concat.exe        # プログラム本体（Linux では video-concat）
-├── ffmpeg.exe              # ffmpeg（Linux では ffmpeg）
+├── ffmpeg.exe              # ffmpeg（Linux では ffmpeg。無い場合は初回起動時に自動ダウンロード）
 ├── video-concat.ini        # 設定ファイル
 ├── README.txt
 ├── _internal/              # Python ランタイム（削除しないでください）
@@ -24,6 +25,9 @@ video-concat-windows-x86_64/
 ```
 
 > フォルダ全体を移動してください。`video-concat.exe` だけを移動すると起動できません。
+
+Linux の配布 zip は実行権限を記録しています。`unzip` で展開すると通常は保持されますが、
+権限が外れた場合は `chmod +x video-concat ffmpeg` を実行してください。
 
 ### 基本操作
 
@@ -113,7 +117,8 @@ auto_download = true
 ### ffmpeg の配置と自動ダウンロード
 
 1. `--ffmpeg PATH` または `ffmpeg.path` が指定されていれば、それを使います。
-2. 指定がなければ、**exe と同じフォルダ**の `ffmpeg.exe` / `ffmpeg` を探します。
+2. 指定がなければ、**exe と同じフォルダ**の `ffmpeg.exe` / `ffmpeg` を探します
+   （`ffmpeg/`、`bin/` サブフォルダも対象です）。
 3. 見つからなければ `PATH` 上の ffmpeg を探します。
 4. それでも見つからず `auto_download = true` なら、初回起動時に自動ダウンロードします。
 
@@ -156,7 +161,7 @@ auto_download = false
 | `--variant` | マスタープレイリストの Variant（0 始まり、既定: `best`） |
 | `--ffmpeg` | ffmpeg の実行パス |
 | `--auto-download / --no-auto-download` | ffmpeg の自動ダウンロードを切り替え |
-| `--keep-segments / --no-keep-segments` | 結合後にセグメントを残す |
+| `--keep-segments / --no-keep-segments` | 結合後にセグメント・`list.txt`・`playlist.m3u8` を残す |
 | `--force / --no-force` | 既存の出力・セグメントを上書き |
 | `--save-playlist` | 取得したメディアプレイリストのコピー先 |
 | `-v, --verbose` | デバッグログを表示 |
@@ -170,6 +175,7 @@ auto_download = false
 - Python 3.10 以上
 - [uv](https://docs.astral.sh/uv/)
 - ffmpeg（ソース実行時は `PATH` 上にあるか `--ffmpeg` で指定）
+- Node.js 18 以上（モック HLS サーバーを使う場合のみ。npm パッケージは不要）
 
 ```bash
 uv sync
@@ -188,7 +194,29 @@ uv run pytest
 ```
 
 E2E テストは ffmpeg が必要です。`vendor/ffmpeg/linux-x86_64/ffmpeg` があるか、
-`VIDEO_CONCAT_TEST_FFMPEG` でパスを指定してください。
+`VIDEO_CONCAT_TEST_FFMPEG` でパスを指定するか、`PATH` に ffmpeg を入れてください。
+
+### モック HLS サーバー
+
+実配信元を使わずに、HTTP ダウンロードと Referer 検査を確認できます。
+Node.js 18 以上が必要です（npm パッケージのインストールは不要）。
+
+```bash
+# 1. テスト用の m3u8 と TS を生成（ffmpeg が必要）
+node tools/mock-hls-server/generate-media.mjs
+
+# 2. Referer を指定して起動
+node tools/mock-hls-server/server.mjs --referer https://example.com/
+
+# 3. 別のターミナルで実行
+uv run video-concat "http://127.0.0.1:8080/master.m3u8" \
+  -H "Referer: https://example.com/" \
+  --ffmpeg vendor/ffmpeg/linux-x86_64/ffmpeg \
+  -o /tmp/mock-out.mp4
+```
+
+Referer がない場合・一致しない場合は 403 になり、`video-concat` もエラー終了します。
+詳細は [tools/mock-hls-server/README.md](tools/mock-hls-server/README.md) を参照してください。
 
 ## 3. ビルド
 
@@ -256,6 +284,7 @@ Windows 版は Linux からクロスビルドできません。必ず Windows 11
 - fMP4（`EXT-X-MAP`）には未対応です。MPEG-TS のプレイリストを対象にしています。
 - `EXT-X-BYTERANGE` には未対応です。
 - 分離された音声トラック（`EXT-X-MEDIA:TYPE=AUDIO`）には未対応です。
+  該当するタグを検出すると警告を表示し、そのまま処理を続けます。
 - `EXT-X-TOKEN` は非標準タグです。値の使い方は配信元によって異なるため、
   `--token-query` または `--token-header` で指定してください。未指定の場合は無視されます。
 - ライブプレイリスト（`EXT-X-ENDLIST` なし）は、実行時点の内容だけをダウンロードします。

@@ -26,8 +26,9 @@ Python 不要の配布版（PyInstaller onedir）を追加した。
 | `EXT-X-TOKEN`（クエリ / ヘッダ） | 実装済み |
 | 設定ファイル（Referer ほか） | 実装済み |
 | ffmpeg の同梱探索・初回自動ダウンロード | 実装済み |
+| モック HLS サーバー（HTTP / Referer 検査） | 実装済み・確認済み |
 | PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
-| Linux 配布版のビルド・E2E | 確認済み |
+| Linux 配布版のビルド・E2E | 確認済み（zip 展開後も確認） |
 | Windows 11 配布版のビルド・E2E | **未確認（Windows 実機が必要）** |
 | 自動テスト | 36 passed |
 | AES-128 / fMP4 / BYTERANGE | 未対応（明示エラー） |
@@ -56,6 +57,13 @@ Windows 11 では PowerShell から:
 .\packaging\build.ps1
 # ffmpeg を取得して同梱する場合
 .\packaging\build.ps1 -FetchFfmpeg
+```
+
+モック HLS サーバー:
+
+```bash
+node tools/mock-hls-server/generate-media.mjs
+node tools/mock-hls-server/server.mjs --referer https://example.com/
 ```
 
 ## 4. 検証コマンド
@@ -109,15 +117,28 @@ uv run pytest tests/test_e2e.py -q
 - 動作確認:
   - `uv run pytest` → 36 passed。
   - Linux 配布版をビルドし、`--help` と引数なしヘルプを確認。
+  - 配布 zip を展開した状態で E2E を実行し、Referer 送信・結合・後始末を確認。
+  - 自動ダウンロードと読み取り専用フォルダのエラーは、展開前の配布フォルダで確認。
   - 配布版で exe 隣の `video-concat.ini` を読み、Referer が m3u8 と各セグメントに送られることを確認。
   - `ffmpeg` を削除した配布版で自動ダウンロード → 結合まで確認。
   - 読み取り専用フォルダで「書き込み権限がありません」エラーになることを確認。
   - `video.m3u8` から 1830 セグメントを解析できることを確認。
+- 2026-11-03: ドキュメントを実装に追従（オプション・探索順・zip 展開時の権限・
+  ライセンスファイルの生成方法）。
+- 2026-11-03: テスト用モック HLS サーバーを追加。
+  - `tools/mock-hls-server/server.mjs` — Node.js 標準モジュールのみ。
+    Referer 完全一致検査、不一致・未指定は 403。
+  - `tools/mock-hls-server/generate-media.mjs` — ffmpeg で MPEG-TS を生成。
+  - 生成物 (`tools/mock-hls-server/media/`) は `.gitignore` 対象。
+  - 動作確認: Referer なし / 不一致 → 403、正しい Referer → 200。
+    `video-concat` で 6 セグメントを取得し、6.16 秒の MP4 を生成。
 
 ## 6. 既知の制約・注意点
 
 - **Windows 11 の配布版は未ビルド・未検証**。Linux から Windows 用 exe は作れない。
   Windows 11 実機で `.\packaging\build.ps1` を実行し、docs/build.md のチェックリストを実施する。
+- Linux の配布 zip は実行権限（`0755`）を記録している。`unzip` は通常それを保持するが、
+  権限が外れた環境では `chmod +x video-concat ffmpeg` が必要。
 - 自動ダウンロードは **配布版のみ**。ソース実行では `--ffmpeg` または `PATH` が必要。
 - exe と同じフォルダに書き込めない場合、自動ダウンロードはエラーになる。
   ユーザーデータ領域へのフォールバックはしない方針。
@@ -130,6 +151,8 @@ uv run pytest tests/test_e2e.py -q
   元のプレイリストが壊れているため、トークンの対応は保証できない。
 - `EXT-X-TOKEN` の正しい使い方（クエリ / ヘッダ / Cookie）は配信元によって異なる。
   実データで確認するまでは `--token-query` / `--token-header` を指定して検証すること。
+- モック HLS サーバーは Node.js 18 以上が必要で、開発時のみ使用する。
+  生成した `tools/mock-hls-server/media/` はコミットしない。
 - ライブ配信は実行時点のスナップショットのみ。
 - セグメント URL にトークンが含まれる場合、`-v` のログに URL が出る可能性がある。
 - 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。
@@ -139,6 +162,7 @@ uv run pytest tests/test_e2e.py -q
 ## 7. 次にやるとよさそうな作業 (候補)
 
 - [ ] Windows 11 実機で `build.ps1` を実行し、配布版の E2E を確認する。
+- [ ] Windows 11 でモック HLS サーバーを使い、Referer 付きダウンロードを確認する。
 - [ ] Windows でスペース・日本語を含むパスの E2E を確認する。
 - [ ] 実 URL で Referer 必須の配信元に対して E2E を確認する。
 - [ ] 必要ならコード署名（SmartScreen 対策）を検討する。

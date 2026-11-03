@@ -111,7 +111,7 @@ ffmpeg を同梱しない場合:
 ```text
 dist/video-concat-windows-x86_64/
 ├── video-concat.exe
-├── ffmpeg.exe
+├── ffmpeg.exe                  # 同梱した場合のみ
 ├── video-concat.ini
 ├── README.txt
 ├── _internal/                  # Python ランタイム
@@ -121,7 +121,7 @@ dist/video-concat-windows-x86_64/
     └── FFMPEG-BUILD-INFO.txt
 ```
 
-Linux では `video-concat` と `ffmpeg` になります。
+Linux では `video-concat` と `ffmpeg` になります。`_internal/` を含む構成は同じです。
 
 - `_internal/` は削除しないでください。
 - フォルダ全体を zip で配布してください。
@@ -138,8 +138,9 @@ Linux では `video-concat` と `ffmpeg` になります。
 - Windows: `ffmpeg-n8.1.3-32-g760d10603e-win64-lgpl-8.1.zip`
 
 SHA256 は `ffmpeg_sources.py` に記載し、自動ダウンロード時に検証します。
-バージョンを更新する場合は、URL・SHA256・サイズ・`packaging/LICENSES/` の
-記載を更新してください。
+バージョンを更新する場合は、URL・SHA256・サイズ・`packaging/LICENSES/FFmpeg-NOTICE.txt`
+の記載を更新してください。`packaging/LICENSES/FFMPEG-BUILD-INFO.txt` は
+`packaging/build.py` がビルド時に生成します。
 
 ### ライセンス
 
@@ -157,9 +158,19 @@ dist/video-concat-linux-x86_64/video-concat --help
 dist/video-concat-linux-x86_64/video-concat      # 引数なし → ヘルプ、終了コード 0
 ```
 
+配布 zip を展開した状態でも確認します。zip は実行権限を記録しており、
+`unzip` は通常それを保持します。権限が外れた場合は
+`chmod +x video-concat ffmpeg` で付与してください。
+
+```bash
+unzip -q dist/video-concat-linux-x86_64.zip -d /tmp/video-concat-dist
+/tmp/video-concat-dist/video-concat-linux-x86_64/video-concat --help
+```
+
 E2E:
 
 1. ローカル HTTP サーバーで m3u8 と合成 TS を配信する。
+   `tools/mock-hls-server/` を使うと Referer 検査（403）も確認できる。
 2. `video-concat.ini` に Referer を設定する。
 3. 配布版で実行し、MP4 が作成されることを確認する。
 4. サーバー側で m3u8 と各セグメントに Referer が届くことを確認する。
@@ -188,6 +199,8 @@ E2E:
 | ffmpeg の自動ダウンロードに失敗する | インターネット接続、プロキシ、GitHub へのアクセス |
 | `SHA256 が一致しません` | 通信経路、配布元の更新、`ffmpeg_sources.py` の値 |
 | `書き込み権限がありません` | exe を書き込み可能なフォルダに置く |
+| `ffmpeg に実行権限がありません` | `chmod +x ffmpeg` を実行するか `--ffmpeg` で指定する |
+| zip 展開後に実行できない（Linux） | `chmod +x video-concat ffmpeg` を実行する |
 | SmartScreen の警告 | 配布元を確認し、必要ならコード署名を検討する |
 | Linux で古い glibc エラー | 古いディストリビューション上でビルドする |
 

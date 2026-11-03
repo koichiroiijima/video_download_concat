@@ -28,7 +28,7 @@ cli.main
         │    ├─ --ffmpeg / 設定の path
         │    ├─ exe と同じフォルダ（_MEIPASS も対応）
         │    ├─ PATH
-        │    └─ 見つからなければ install_ffmpeg（初回自動ダウンロード）
+        │    └─ 見つからなければ install_ffmpeg（配布版のみ初回自動ダウンロード）
         │
         ├─ downloader.download_segments
         │    ├─ ThreadPoolExecutor で並列取得
@@ -65,6 +65,11 @@ cli.main
 │   ├── video-concat.ini      配布用設定ファイル
 │   ├── README-dist.txt       配布用 README
 │   └── LICENSES/             ffmpeg のライセンス
+├── tools/mock-hls-server/
+│   ├── server.mjs            Referer 検査付きモック HLS サーバー
+│   ├── generate-media.mjs    ffmpeg でテスト用 TS を生成
+│   ├── package.json          npm スクリプト（依存パッケージなし）
+│   └── README.md             使い方
 ├── src/video_concat/
 │   ├── __init__.py
 │   ├── __main__.py           python -m video_concat の入口
@@ -151,7 +156,7 @@ cli.main
 - 標準ライブラリ `urllib.request` のみ使用。
 - `fetch_text()` / `fetch_text_with_url()` と `download_file()` は指数バックオフでリトライ。
 - `fetch_text_with_url()` はリダイレクト後の最終 URL も返し、プレイリストの相対 URI はその URL を基準に解決する。
-- リトライ対象: 408 / 425 / 429 / 5xx、URLError、タイムアウト、HTTPException。
+- リトライ対象: 408 / 425 / 429 / 500 / 502 / 503 / 504、URLError、タイムアウト、HTTPException。
 - `download_file()` は `*.part` に書き、Content-Length と一致したら atomic にリネーム。
 - `download_file()` は任意の進捗コールバックを受け取れる。ffmpeg 本体の
   ダウンロード進捗に使う。
@@ -194,6 +199,20 @@ cli.main
 - `select_variant()`: `best` は BANDWIDTH → 解像度の順で最大を選ぶ。数値指定は 0 始まり。
 - `apply_token()`: `EXT-X-TOKEN` をクエリパラメータとして付与する。
 
+### `tools/mock-hls-server`
+
+- 開発時のみ使う Node.js 製のテストサーバー。Python の配布物には含めない。
+- `server.mjs` は標準モジュールだけで実装し、配信ディレクトリのファイルを返す。
+  - `--referer` は完全一致。複数指定可。未指定なら検査しない。
+  - `/`、`/index.html`、`/health` は Referer 検査の対象外。
+  - `GET` / `HEAD` のみ対応し、それ以外は 405 を返す。
+  - `decodeURIComponent` 後のパスを `path.resolve` で正規化し、
+    配信ディレクトリ外への参照は 403 にする。
+  - 403 時は理由（ヘッダーなし / 不一致）と許可値を返す。
+- `generate-media.mjs` は ffmpeg で MPEG-TS を生成し、
+  `master.m3u8` と `v0/playlist.m3u8` を書き出す。
+- `media/` は `.gitignore` 対象で、リポジトリには含めない。
+
 ## 4. データフロー
 
 1. 引数検証と設定ファイルの読み込み。
@@ -212,6 +231,7 @@ cli.main
 - **配布版は onedir**。exe と同じフォルダに ffmpeg を置く形式にし、
   初回起動時の自動ダウンロードにも対応する。
 - **自動ダウンロードは配布版のみ**。ソース実行では `--ffmpeg` または `PATH` を使う。
+  `sys.frozen` が偽なら自動ダウンロードせず、手動配置を案内する。
 - **書き込み不可時はエラー**。exe フォルダ以外へのフォールバックはしない。
 - **プレイリスト順**を正とする。`list.cmd` のようなファイル名ソートは行わない。
 - **MPEG-TS を前提**とし、AES-128 / SAMPLE-AES / fMP4 / BYTERANGE は明示的にエラーにする。
@@ -229,3 +249,11 @@ cli.main
   - ffmpeg の同梱探索と初回自動ダウンロード。
   - PyInstaller onedir ビルド、Windows / Linux ビルドスクリプト。
   - テストと配布ドキュメントを追加。
+- 2026-11-03: 実装に合わせてドキュメントを更新。
+  - README の ffmpeg 探索順に `ffmpeg/`・`bin/` を追記。
+  - Linux 配布 zip 展開時の実行権限（`chmod +x`）を README / build に追記。
+  - `--keep-segments` が残すファイル、`EXT-X-MEDIA` の警告動作を明記。
+  - `FFMPEG-BUILD-INFO.txt` がビルド時生成であることを明記。
+- 2026-11-03: テスト用モック HLS サーバーを追加。
+  - `tools/mock-hls-server/server.mjs`（Referer 完全一致検査、403）。
+  - `tools/mock-hls-server/generate-media.mjs`（ffmpeg で TS 生成）。

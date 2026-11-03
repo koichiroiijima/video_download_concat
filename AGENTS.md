@@ -47,6 +47,10 @@ uv run python packaging/fetch_ffmpeg.py
 # Windows 11 配布版ビルド（Windows 実機）
 .\packaging\build.ps1
 .\packaging\build.ps1 -FetchFfmpeg
+
+# モック HLS サーバー（Node.js 18 以上、npm 依存なし）
+node tools/mock-hls-server/generate-media.mjs
+node tools/mock-hls-server/server.mjs --referer https://example.com/
 ```
 
 パーサーのスモークテスト:
@@ -89,6 +93,7 @@ PY
 - `.venv/`、`__pycache__/`、`*.py[cod]`
 - `build/`、`dist/`、`.pytest_cache/`
 - `vendor/ffmpeg/`（ダウンロードした ffmpeg 本体）
+- `tools/mock-hls-server/media/`（モックサーバー用の生成物）
 - `*.mp4`、`*_segments/`、`list.txt`、`*.part`
 - ルートの `video-concat.ini`（利用者固有の設定。配布用は `packaging/video-concat.ini`）
 - ダウンロードしたセグメント・生成物
@@ -99,7 +104,9 @@ PY
 - `uv`（仮想環境・依存管理・実行）
 - `ffmpeg`（結合・テスト用。配布版は同梱または自動ダウンロード）
 - PyInstaller（配布版ビルド）
-- スキル: `iniit-python-project`、`project-docs`、`commit`、`test`、`review`
+- Node.js 18 以上（モック HLS サーバー用。npm パッケージは不要）
+- スキル: `project-docs`（ドキュメント更新）、`commit`、`test`、`review`、
+  `iniit-python-project`、`opencode`、`report`
 
 ## 7. 作業の進め方 (推奨フロー)
 
@@ -107,6 +114,7 @@ PY
 2. 変更を実装する（表示文言は日本語）。
 3. `uv run pytest` と `uv run video-concat --help` で確認する。
 4. 必要なら `packaging/fetch_ffmpeg.py` で ffmpeg を用意し、E2E を実行する。
+   モック HLS サーバー（`tools/mock-hls-server/`）でも Referer と 403 を確認できる。
 5. Linux 配布版をビルドして `--help` / 引数なしヘルプ / E2E を確認する。
 6. ドキュメント（README / docs / handover）を実装に追従させる。
 7. 差分を確認しコミットする（push はユーザー確認後）。

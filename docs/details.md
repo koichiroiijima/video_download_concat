@@ -39,7 +39,7 @@ uv run python -m video_concat SOURCE [OPTIONS]
 | 既定の作業ディレクトリ | `<出力名>_segments` |
 | セグメント名 | `0000.ts`, `0001.ts`, ...（プレイリスト順のゼロ埋め連番） |
 | 成功時 | 出力 MP4 を残し、セグメント・`list.txt`・`playlist.m3u8` を削除 |
-| `--keep-segments` | セグメント一式を残す |
+| `--keep-segments` | セグメント一式と `list.txt`・`playlist.m3u8` を残す |
 | 再実行 | 既存の非空セグメントを再利用（`--force` で再取得） |
 
 ### オプション
@@ -60,7 +60,7 @@ uv run python -m video_concat SOURCE [OPTIONS]
 | `--variant` | `best` | マスターの Variant（0 始まりの番号 or `best`） |
 | `--ffmpeg` | 同梱 → `PATH` | ffmpeg の実行パス |
 | `--auto-download / --no-auto-download` | 有効 | ffmpeg が見つからない場合の自動ダウンロード |
-| `--keep-segments / --no-keep-segments` | 無効 | 結合後にセグメントを削除しない |
+| `--keep-segments / --no-keep-segments` | 無効 | 結合後にセグメント・`list.txt`・`playlist.m3u8` を削除しない |
 | `--force / --no-force` | 無効 | 既存の出力・セグメントを上書き |
 | `--save-playlist` | なし | 取得したメディアプレイリストのコピー先 |
 | `-v, --verbose` | 無効 | デバッグログを表示 |
@@ -179,7 +179,7 @@ Referer は m3u8 本体、マスターの子プレイリスト、すべてのセ
 | --- | --- |
 | 引数なし | ヘルプを表示して終了コード 0 |
 | `ffmpeg` が見つからない（自動ダウンロード無効） | 手動配置と `--ffmpeg` を案内して終了コード 1 |
-| `ffmpeg` の自動ダウンロード失敗 | 取得元と手動配置を案内して終了コード 1 |
+| `ffmpeg` の自動ダウンロード失敗 | 手動配置と `--ffmpeg` を案内して終了コード 1 |
 | ffmpeg の SHA256 不一致 | `SHA256 が一致しません` を含むエラー |
 | exe フォルダに書き込めない | `書き込み権限がありません` を含むエラー |
 | 出力ファイルが既に存在 | `--force` を促して終了コード 1 |
@@ -187,8 +187,8 @@ Referer は m3u8 本体、マスターの子プレイリスト、すべてのセ
 | 設定ファイルの形式・値が不正 | 該当セクション・キーを含むエラー |
 | m3u8 が存在しない | `m3u8 ファイルが見つかりません` |
 | m3u8 にセグメントがない | `プレイリストにセグメントがありません` |
-| HTTP 4xx（リトライ対象外） | `HTTP <code> <reason>` を含むエラー |
-| HTTP 5xx / タイムアウト / 接続失敗 | 指数バックオフでリトライ後、失敗を報告 |
+| HTTP 4xx（408 / 425 / 429 を除く） | `HTTP <code> <reason>` を含むエラー |
+| HTTP 500 / 502 / 503 / 504 / タイムアウト / 接続失敗 | 指数バックオフでリトライ後、失敗を報告 |
 | Content-Length 不一致 | リトライ対象。最終的に失敗したらエラー |
 | セグメントの一部が失敗 | 失敗セグメント番号と理由を最大 5 件表示し、終了コード 1 |
 | 暗号化 HLS | `暗号化された HLS（...）には未対応です` |
@@ -215,18 +215,46 @@ uv run pytest
 | `tests/test_e2e.py` | 合成 TS、HTTP 配信、Referer、ffmpeg 結合 |
 
 E2E は ffmpeg が必要です。`vendor/ffmpeg/linux-x86_64/ffmpeg` があるか、
-`VIDEO_CONCAT_TEST_FFMPEG` でパスを指定してください。ない場合はスキップされます。
+`VIDEO_CONCAT_TEST_FFMPEG` でパスを指定するか、`PATH` に ffmpeg を入れてください。
+ない場合はスキップされます。
 
 ### 実施済みの確認
 
 - `uv run pytest` → 36 passed
 - Linux 配布版のビルドと `--help` / 引数なしヘルプ
+- 配布 zip を展開した状態でも E2E を実行し、Referer 送信・結合・後始末を確認
+- 配布 zip が実行ファイルの権限（`0755`）を記録していることを確認
 - 配布版で exe 隣の設定ファイルを読む E2E
 - 配布版で ffmpeg を削除して再実行し、自動ダウンロード → 結合まで確認
 - 読み取り専用フォルダで自動配置がエラーになることを確認
 - `video.m3u8` のパーサー確認（1830 セグメント）
 
-## 6. 変更時に確認するコマンド
+## 6. モック HLS サーバー
+
+実配信元を使わずに、HTTP ダウンロードと Referer 検査を確認するための
+テスト用サーバーです。Node.js 18 以上で動作し、npm パッケージは不要です。
+
+```bash
+node tools/mock-hls-server/generate-media.mjs   # media/ を生成
+node tools/mock-hls-server/server.mjs --referer https://example.com/
+```
+
+| 項目 | 内容 |
+| --- | --- |
+| 配信 URL | `/master.m3u8`, `/v0/playlist.m3u8`, `/v0/segmentNNN.ts` |
+| 既定の待ち受け | `127.0.0.1:8080` |
+| Referer 検査 | `--referer` 指定時のみ。完全一致 |
+| Referer なし / 不一致 | 403（`Referer ヘッダーがありません` / `Referer が許可されていません`） |
+| 検査対象外 | `/`、`/index.html`、`/health` |
+| パストラバーサル | 配信ディレクトリ外は 403 |
+| 対応メソッド | `GET` / `HEAD`（それ以外は 405） |
+| メディア生成 | ffmpeg で 1 秒の MPEG-TS を 6 個（既定） |
+
+生成物 (`tools/mock-hls-server/media/`) は `.gitignore` の対象です。
+サーバーのオプション（`--host` / `--port` / `--dir` / `--referer` / `-q`）と
+動作確認の手順は `tools/mock-hls-server/README.md` を参照してください。
+
+## 7. 変更時に確認するコマンド
 
 ```bash
 uv sync
@@ -246,7 +274,7 @@ uv run python -m compileall -q src packaging tests
 .\packaging\build.ps1
 ```
 
-## 7. 拡張時の注意点
+## 8. 拡張時の注意点
 
 - セグメントの順序は必ずプレイリスト順を維持する。ファイル名ソートに変更しない。
 - `.jpeg` など拡張子が異なるセグメントを除外しない。
@@ -257,5 +285,6 @@ uv run python -m compileall -q src packaging tests
 - ログにトークンや Cookie を含む URL を出さないよう、`-v` の扱いに注意する。
 - 設定ファイルに秘密情報を書く運用をする場合、配布物に含めないよう注意する。
 - ffmpeg の配布元 URL・SHA256 を更新したら、`ffmpeg_sources.py` と
-  `packaging/LICENSES/FFMPEG-BUILD-INFO.txt` を更新する。
+  `packaging/LICENSES/FFmpeg-NOTICE.txt` を更新する。
+  `packaging/LICENSES/FFMPEG-BUILD-INFO.txt` はビルド時に自動生成される。
 - Windows では `list.txt` のパスにバックスラッシュを使わない（`/` に正規化する）。
