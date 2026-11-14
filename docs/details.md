@@ -38,7 +38,7 @@ uv run python -m video_concat SOURCE [OPTIONS]
 | 既定の出力名 | `YYYYmmddHHMMSS.mp4` |
 | 既定の作業ディレクトリ | `<出力名>_segments` |
 | セグメント名 | `0000.ts`, `0001.ts`, ...（プレイリスト順のゼロ埋め連番） |
-| 成功時 | 出力 MP4 を残し、セグメント・`list.txt`・`playlist.m3u8` を削除 |
+| 成功時 | 出力 MP4 を残し、セグメント・`list.txt`・作業ディレクトリの `playlist.m3u8` を削除。`--save-playlist` のコピー先とローカル入力の m3u8 は残す |
 | `--keep-segments` | セグメント一式と `list.txt`・`playlist.m3u8` を残す |
 | 再実行 | 既存の非空セグメントを再利用（`--force` で再取得） |
 

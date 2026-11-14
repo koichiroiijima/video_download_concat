@@ -151,6 +151,9 @@ uv run pytest tests/test_e2e.py -q
   - `SOURCE` にはローカルの `.m3u8` だけでなく `file://` URI も指定できる。
 - 2026-11-14: `docs/build.md` に Linux ビルドの `--skip-ffmpeg --no-zip` を追記
   （実装の変更はなし。`packaging/build.py` は以前から対応済み）。
+- 2026-11-14: 後始末の記述を実装に合わせて修正（実装の変更はなし）。
+  `--save-playlist` のコピー先とローカル入力の m3u8 は成功後も残ることを
+  `docs/design.md` / `docs/details.md` に明記。
 
 ## 6. 既知の制約・注意点
 
