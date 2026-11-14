@@ -39,7 +39,7 @@ video-concat の動作確認用モック HLS サーバーです。
   node server.mjs --referer https://example.com/ --referer https://example.com/watch/1
 
 Referer の判定は完全一致です。Referer ヘッダーがない場合も 403 になります。
-/ と /index.html と /health は Referer 検査の対象外です。
+/ と /index.html と /player.html と /health は Referer 検査の対象外です。
 `;
 
 function fail(message) {
@@ -171,11 +171,39 @@ function buildIndexHtml(options, baseUrl) {
   <ul>
     <li><a href="/master.m3u8">/master.m3u8</a>（マスタープレイリスト）</li>
     <li><a href="/v0/playlist.m3u8">/v0/playlist.m3u8</a>（メディアプレイリスト）</li>
+    <li><a href="/player.html">/player.html</a>（再生ページ）</li>
     <li><a href="/health">/health</a>（稼働確認）</li>
   </ul>
   <h2>動作確認</h2>
   <pre>curl${refererHeader} ${escapeHtml(baseUrl)}/v0/playlist.m3u8</pre>
   <pre>uv run video-concat "${escapeHtml(baseUrl)}/master.m3u8"${videoConcatHeader}</pre>
+  <pre>uv run video-concat --from-page "${escapeHtml(baseUrl)}/player.html" --page-mode static</pre>
+  <pre>uv run video-concat --from-page "${escapeHtml(baseUrl)}/player.html" --page-mode browser</pre>
+  <p>Referer 検査を有効にしている場合、<code>--from-page</code> と
+     <code>--page-mode browser</code> はページ URL を Referer に使います。
+     許可する Referer にページ URL を含めてください。</p>
+</body>
+</html>
+`;
+}
+
+function buildPlayerHtml() {
+  return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>video-concat モック HLS 再生ページ</title>
+</head>
+<body>
+  <h1>モック HLS 再生ページ</h1>
+  <p>このページは --from-page の動作確認用です。</p>
+  <video id="player" controls autoplay muted playsinline src="/master.m3u8" width="320"></video>
+  <script>
+    const player = document.getElementById("player");
+    player.addEventListener("loadedmetadata", () => {
+      player.play().catch(() => {});
+    });
+  </script>
 </body>
 </html>
 `;
@@ -290,6 +318,11 @@ async function handleRequest(req, res) {
       return;
     }
 
+    if (pathname === "/player.html") {
+      sendHtml(buildPlayerHtml());
+      return;
+    }
+
     if (options.allowedReferers.length > 0) {
       if (!referer) {
         sendText(403, `403 Forbidden: Referer ヘッダーがありません。\n${allowedRefererText()}`);
@@ -392,6 +425,7 @@ server.listen(options.port, options.host, () => {
   console.log(`  ベース URL: ${baseUrl}/`);
   console.log(`  マスター:   ${baseUrl}/master.m3u8`);
   console.log(`  メディア:   ${baseUrl}/v0/playlist.m3u8`);
+  console.log(`  再生ページ: ${baseUrl}/player.html`);
   console.log(`  配信元:     ${options.mediaDir}`);
   if (options.allowedReferers.length > 0) {
     console.log("  Referer 検査: 有効（完全一致）");
@@ -408,6 +442,9 @@ server.listen(options.port, options.host, () => {
       ? ` -H "Referer: ${options.allowedReferers[0]}"`
       : "";
   console.log(`  uv run video-concat "${baseUrl}/master.m3u8"${header}`);
+  console.log(
+    `  uv run video-concat --from-page "${baseUrl}/player.html" --page-mode static`,
+  );
   console.log("");
   console.log("終了: Ctrl+C");
 });

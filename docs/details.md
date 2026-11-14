@@ -321,12 +321,13 @@ node tools/mock-hls-server/server.mjs --referer https://example.com/
 
 | 項目 | 内容 |
 | --- | --- |
-| 配信 URL | `/master.m3u8`, `/v0/playlist.m3u8`, `/v0/segmentNNN.ts` |
+| 配信 URL | `/master.m3u8`, `/v0/playlist.m3u8`, `/v0/segmentNNN.ts`, `/player.html` |
 | 既定の待ち受け | `127.0.0.1:8080` |
 | Referer 検査 | `--referer` 指定時のみ。完全一致 |
 | Referer なし / 不一致 | 403（`Referer ヘッダーがありません` / `Referer が許可されていません`） |
-| 検査対象外 | `/`、`/index.html`、`/health` |
+| 検査対象外 | `/`、`/index.html`、`/player.html`、`/health` |
 | 案内ページ | `/` と `/index.html` は使い方の HTML、`/health` は `{"ok":true}` を返す |
+| 再生ページ | `/player.html` は `<video>` で `/master.m3u8` を読み込む。`--from-page` の確認用 |
 | パストラバーサル | 配信ディレクトリ外は 403 |
 | 対応メソッド | `GET` / `HEAD`（それ以外は 405） |
 | メディア生成 | ffmpeg で 1 秒の MPEG-TS を 6 個（既定） |

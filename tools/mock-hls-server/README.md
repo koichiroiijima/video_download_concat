@@ -68,14 +68,15 @@ node tools/mock-hls-server/server.mjs --referer https://example.com/
 
 - `http://127.0.0.1:8080/master.m3u8`
 - `http://127.0.0.1:8080/v0/playlist.m3u8`
+- `http://127.0.0.1:8080/player.html`（`--from-page` の確認用）
 - `http://127.0.0.1:8080/health`
 
 `--port 0` を指定すると空きポートを自動選択します。
 
 ### Referer の動作
 
-`--referer` を 1 つ以上指定すると、`/`、`/index.html`、`/health` 以外のすべての
-リクエストで Referer を検査します。
+`--referer` を 1 つ以上指定すると、`/`、`/index.html`、`/player.html`、`/health`
+以外のすべてのリクエストで Referer を検査します。
 
 | リクエスト | 結果 |
 | --- | --- |
@@ -110,6 +111,29 @@ referer = https://example.com/
 
 Referer を付けずに実行すると、配信元が 403 を返すため
 `video-concat` はエラー終了します。拒否の動作確認に使えます。
+
+### Webページから m3u8 を探す（`--from-page`）
+
+`/player.html` は `<video>` で `/master.m3u8` を読み込む再生ページです。
+静的解析とブラウザ方式の両方を確認できます。
+
+```bash
+# 静的解析（ページの HTML から m3u8 を抽出）
+uv run video-concat --from-page "http://127.0.0.1:8080/player.html" \
+  --page-mode static \
+  --ffmpeg vendor/ffmpeg/linux-x86_64/ffmpeg \
+  -o /tmp/from-page-static.mp4
+
+# ブラウザ方式（Chrome / Edge / Chromium が必要）
+uv run video-concat --from-page "http://127.0.0.1:8080/player.html" \
+  --page-mode browser \
+  --ffmpeg vendor/ffmpeg/linux-x86_64/ffmpeg \
+  -o /tmp/from-page-browser.mp4
+```
+
+Referer 検査を有効にしたサーバーで `--from-page` を使う場合、静的解析はページ URL を
+Referer にします。`--referer` にページ URL（例:
+`http://127.0.0.1:8080/player.html`）を含めて起動してください。
 
 ## 3. サーバーのオプション
 

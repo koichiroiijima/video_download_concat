@@ -317,8 +317,10 @@ cli.main
 - 開発時のみ使う Node.js 製のテストサーバー。Python の配布物には含めない。
 - `server.mjs` は標準モジュールだけで実装し、配信ディレクトリのファイルを返す。
   - `--referer` は完全一致。複数指定可。未指定なら検査しない。
-  - `/`、`/index.html`、`/health` は Referer 検査の対象外。
-    `/` と `/index.html` は使い方の HTML、`/health` は `{"ok":true}` を返す。
+  - `/`、`/index.html`、`/player.html`、`/health` は Referer 検査の対象外。
+    `/` と `/index.html` は使い方の HTML、`/player.html` は `<video>` で
+    `/master.m3u8` を読み込む再生ページ、`/health` は `{"ok":true}` を返す。
+  - `/player.html` は `--from-page` の静的解析・ブラウザ方式の手動確認に使う。
   - `GET` / `HEAD` のみ対応し、それ以外は 405 を返す。
   - `decodeURIComponent` 後のパスを `path.resolve` で正規化し、
     配信ディレクトリ外への参照は 403 にする。
@@ -408,3 +410,6 @@ cli.main
     `tests/test_e2e.py`（静的解析の E2E、ブラウザ方式の Cookie / Referer E2E）。
   - `CdpConnection.pump()` がイベント待ちのタイムアウトを例外にせず、
     待ち時間の経過として扱うよう修正。
+- 2026-11-14: モック HLS サーバーに `/player.html` を追加。
+  `<video>` で `/master.m3u8` を読み込み、`--from-page` の静的解析と
+  ブラウザ方式を手動で確認できる。Referer 検査の対象外。
