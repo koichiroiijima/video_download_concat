@@ -23,7 +23,7 @@ uv run python -m video_concat SOURCE [OPTIONS]
 
 | 項目 | 内容 |
 | --- | --- |
-| `SOURCE` | `http://` / `https://` の m3u8 URL、またはローカルの `.m3u8` ファイル |
+| `SOURCE` | `http://` / `https://` の m3u8 URL、ローカルの `.m3u8` ファイル、または `file://` URI |
 | マスタープレイリスト | `EXT-X-STREAM-INF` を解釈し、`--variant` で選択 |
 | メディアプレイリスト | `EXTINF` と URI 行を順に取得 |
 | 相対 URI | m3u8 の URL（ローカルなら `file://`）を基準に解決 |
@@ -247,6 +247,7 @@ node tools/mock-hls-server/server.mjs --referer https://example.com/
 | Referer 検査 | `--referer` 指定時のみ。完全一致 |
 | Referer なし / 不一致 | 403（`Referer ヘッダーがありません` / `Referer が許可されていません`） |
 | 検査対象外 | `/`、`/index.html`、`/health` |
+| 案内ページ | `/` と `/index.html` は使い方の HTML、`/health` は `{"ok":true}` を返す |
 | パストラバーサル | 配信ディレクトリ外は 403 |
 | 対応メソッド | `GET` / `HEAD`（それ以外は 405） |
 | メディア生成 | ffmpeg で 1 秒の MPEG-TS を 6 個（既定） |

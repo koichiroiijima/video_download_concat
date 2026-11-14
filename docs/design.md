@@ -208,6 +208,7 @@ cli.main
 - `server.mjs` は標準モジュールだけで実装し、配信ディレクトリのファイルを返す。
   - `--referer` は完全一致。複数指定可。未指定なら検査しない。
   - `/`、`/index.html`、`/health` は Referer 検査の対象外。
+    `/` と `/index.html` は使い方の HTML、`/health` は `{"ok":true}` を返す。
   - `GET` / `HEAD` のみ対応し、それ以外は 405 を返す。
   - `decodeURIComponent` 後のパスを `path.resolve` で正規化し、
     配信ディレクトリ外への参照は 403 にする。
