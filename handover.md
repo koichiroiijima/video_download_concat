@@ -154,6 +154,13 @@ uv run pytest tests/test_e2e.py -q
 - 2026-11-14: 後始末の記述を実装に合わせて修正（実装の変更はなし）。
   `--save-playlist` のコピー先とローカル入力の m3u8 は成功後も残ることを
   `docs/design.md` / `docs/details.md` に明記。
+- 2026-11-14: `src/video_concat/net.py` に `max_bytes` を追加（実装の変更）。
+  - `fetch_text()` / `fetch_text_with_url()` が任意の `max_bytes` を受け取る。
+  - 指定時は `max_bytes + 1` バイトまで読み、超過したら
+    `応答が大きすぎます（上限 N バイト）` の `DownloadError` で即座に失敗する
+    （リトライ対象外）。
+  - 既定は `None`（上限なし）。CLI からの指定はまだ無いため、利用者向けの
+    振る舞いに変化はない。テストも未追加。
 
 ## 6. 既知の制約・注意点
 

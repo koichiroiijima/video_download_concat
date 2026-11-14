@@ -163,6 +163,10 @@ cli.main
 - `download_file()` は `*.part` に書き、Content-Length と一致したら atomic にリネーム。
 - `download_file()` は任意の進捗コールバックを受け取れる。ffmpeg 本体の
   ダウンロード進捗に使う。
+- `fetch_text()` / `fetch_text_with_url()` は任意の `max_bytes` を受け取れる。
+  指定すると `max_bytes + 1` バイトまで読み、超過したら
+  `DownloadError`（`応答が大きすぎます（上限 N バイト）`）にして即座に失敗する。
+  この例外はリトライ対象に含めない。未指定なら上限なしで全体を読む。
 - `Accept-Encoding: identity` を送り、Content-Length と実バイト数を比較できるようにする。
 
 ### `downloader.py`
@@ -266,3 +270,6 @@ cli.main
 - 2026-11-14: モックサーバーの Referer 検査対象外に `/index.html` を追記。
 - 2026-11-14: 実データのサンプル `video.m3u8` をリポジトリから削除。
   スモークテストの例は手元の m3u8 を使う形に変更。
+- 2026-11-14: `net.fetch_text()` / `fetch_text_with_url()` に `max_bytes` を追加。
+  応答サイズの上限を指定でき、超過時は `DownloadError` にしてリトライしない。
+  既定は `None`（上限なし）で、現時点で CLI からの指定はない。

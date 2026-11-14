@@ -289,6 +289,9 @@ uv run python -m compileall -q src packaging tests
   含む場合がある）。解析の確認にはモックサーバーの生成物か
   `--save-playlist` で保存したプレイリストを使う。
 - 設定ファイルに秘密情報を書く運用をする場合、配布物に含めないよう注意する。
+- `net.fetch_text()` / `net.fetch_text_with_url()` は `max_bytes` で応答サイズの
+  上限を指定できる（超過時は `応答が大きすぎます` の `DownloadError`、リトライしない）。
+  CLI からは現時点で未指定のため、上限なしで取得する。
 - ffmpeg の配布元 URL・SHA256 を更新したら、`ffmpeg_sources.py` と
   `packaging/LICENSES/FFmpeg-NOTICE.txt` を更新する。
   `packaging/LICENSES/FFMPEG-BUILD-INFO.txt` はビルド時に自動生成される。
