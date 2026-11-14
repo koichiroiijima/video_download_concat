@@ -222,8 +222,8 @@ cli.main
 
 - Webページ（HTML・インライン JavaScript・同一オリジンの外部スクリプト・iframe）を
   静的に走査し、m3u8 URL の候補を抽出する。JavaScript は実行しない。
-- **現時点では CLI から未接続**。`cli.py` は本モジュールを参照していない。
-  JavaScript 実行時の URL 生成に対応する `browser_cdp` も未実装（docstring のみ言及）。
+- `cli._discover_page` から呼ばれる（`--page-mode static`、または `auto` の
+  1 段目）。ブラウザ方式は `browser_cdp.py` が担当する。
 - `extract_m3u8_urls()`:
   - `\/`・`\uXXXX`・`\xXX` と HTML エンティティを戻してから走査する。
   - 絶対 / プロトコル相対、引用符内の相対、ルート相対の 3 種類を正規表現で拾う。
@@ -245,28 +245,70 @@ cli.main
   - 失敗理由は `SourceCandidate.error` に残す。並列数は既定 8
     （`ThreadPoolExecutor`）。
 - `select_candidate()`:
-  - `index` 指定（想定は `--source-index`）があればそれを採用し、範囲外・取得失敗は
+  - `--source-index` の値（`index`）があればそれを採用し、範囲外・取得失敗は
     `DiscoveryError`。
   - 有効な候補が 1 件なら自動選択する。
-  - 複数かつ非対話（stdin が TTY でない）なら `DiscoveryError`。
+  - 複数かつ非対話（stdin が TTY でない）なら `DiscoveryError` にして
+    `--source-index` を案内する。
   - 対話時は候補一覧を stderr に出し、番号入力を最大 3 回受け付ける。
-    空 Enter は最初の有効候補。
+    空 Enter は最初の有効候補。選択できなければ `DiscoveryError`。
 - `format_candidate()`: 一覧表示用に、マスター（Variant 数）/ メディア
-  （セグメント数・合計時間）/ 取得失敗を整形する。
-- `select_candidate()` のエラーメッセージは `--page-mode` / `--source-index` に
-  言及するが、これらは CLI に未実装。CLI へ接続するときに整合させる（TODO）。
+  （セグメント数・合計時間）/ 取得失敗を整形する。`--list-candidates` で使う。
+- 候補を選んだあと、`cli.run` が `Referer` を最終ページ URL で補い、
+  候補に付いたヘッダ（ブラウザが送った Referer / Origin / Cookie / User-Agent）を
+  明示指定の無い項目だけ `setdefault` でマージする。
+
+### `browser_cdp.py`
+
+- Chrome / Edge / Chromium を CDP（Chrome DevTools Protocol）で操作し、
+  ページの通信から m3u8 を検出する。ブラウザ本体は利用者環境のものを使う。
+- `ws.py` の WebSocket で CDP に接続するため、Python の実行時依存は増えない。
+- `find_browser()` の探索順:
+  1. `--browser-path`（ファイルパス、または `PATH` 上の名前）
+  2. 環境変数 `VIDEO_CONCAT_BROWSER`
+  3. Windows: `ProgramFiles(x86)` / `ProgramFiles` / `LOCALAPPDATA` 配下の
+     Edge / Chrome / Chromium、次に `PATH` の `msedge` / `chrome`
+  4. Linux: `microsoft-edge` / `microsoft-edge-stable` / `google-chrome` /
+     `google-chrome-stable` / `chromium` / `chromium-browser` / `chrome`
+  - 見つからなければ `BrowserError`（`--browser-path` を案内）。
+- `BrowserSession`:
+  - `--user-data-dir` 未指定なら一時ディレクトリを作り、終了時に削除する。
+  - `--remote-debugging-port=0` で起動し、`DevToolsActivePort` から実際の
+    ポートを読む（`startup_timeout` は既定 15 秒）。
+  - ヘッドレスは `--headless=new` を試し、失敗したら `--headless` に切り替える。
+    `--headed` 指定時は画面表示ありで起動する。
+  - 自動再生・ミュート・ウィンドウサイズ・初回起動ダイアログ無効化などの
+    フラグを付ける。root 実行時は `--no-sandbox`、Windows 以外では
+    `--disable-dev-shm-usage`。
+  - Windows のヘッドレスでは `CREATE_NO_WINDOW` を付ける。
+- 検出:
+  - `Page.enable` / `Network.enable` / `Runtime.enable` と
+    `Network.setCacheDisabled` を送る。
+  - `Network.responseReceived` で URL に `.m3u8` を含む、または MIME が
+    `application/vnd.apple.mpegurl` などの HLS 形式のものを候補にする
+    （`http` / `https` のみ、初出順）。
+  - `Network.requestWillBeSent` / `...ExtraInfo` から Referer / Origin / Cookie /
+    User-Agent を控え、Cookie が無ければ `Network.getCookies` で補う。
+  - ページ読み込み後に `video.play()`・`video.click()`・一般的な再生ボタンの
+    セレクタで再生を試み、`page_wait` 秒（既定 5）待つ。候補が無ければ
+    もう一度だけ再生を試す。`--click-selector` の要素もクリックする。
+  - 収集した候補は `page_source.probe_candidates()` で検証する（並列 4）。
+- 後始末:
+  - CDP 接続とブラウザプロセスを閉じ、一時ログと（自分で作った）一時
+    ユーザーデータディレクトリを削除する。
+- `discover_browser()` は `BrowserSession` をラップし、CDP / WebSocket /
+  OS エラーを `BrowserError` に変換する。
 
 ### `ws.py`
 
 - Chrome DevTools Protocol に接続するための最小 WebSocket クライアント。
-  標準ライブラリのみで実装する。
+  標準ライブラリのみで実装し、`browser_cdp.py` から使う。
 - `ws://` のみ対応（`wss://` は未対応）。
 - HTTP Upgrade でハンドシェイクし、`101` と `Sec-WebSocket-Accept` を検証する。
 - 送信フレームは常にマスクする。受信は分割フレームを結合し、ping には pong を返し、
   close では `WebSocketError` を送出する。
 - 1 メッセージの上限は 64 MiB、ハンドシェイク応答ヘッダは 64 KiB まで。
 - コンテキストマネージャに対応し、`settimeout()` でソケットのタイムアウトを変更できる。
-- **現時点では CLI から未接続**。
 
 ### `tools/mock-hls-server`
 
