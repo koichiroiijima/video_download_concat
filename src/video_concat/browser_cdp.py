@@ -707,16 +707,21 @@ def discover_browser(
 ) -> DiscoveryResult:
     """ブラウザでページを開き、m3u8 の通信を検出する。"""
     executable = find_browser(browser_path)
-    with BrowserSession(
-        executable,
-        headed=headed,
-        user_data_dir=user_data_dir,
-        user_agent=user_agent,
-        timeout=timeout,
-    ) as session:
-        return session.discover(
-            page_url,
-            headers=headers,
-            page_wait=page_wait,
-            click_selector=click_selector,
-        )
+    try:
+        with BrowserSession(
+            executable,
+            headed=headed,
+            user_data_dir=user_data_dir,
+            user_agent=user_agent,
+            timeout=timeout,
+        ) as session:
+            return session.discover(
+                page_url,
+                headers=headers,
+                page_wait=page_wait,
+                click_selector=click_selector,
+            )
+    except BrowserError:
+        raise
+    except (CdpError, WebSocketError, OSError) as exc:
+        raise BrowserError(f"ブラウザ操作に失敗しました: {exc}") from exc

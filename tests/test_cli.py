@@ -49,3 +49,55 @@ def test_invalid_config_returns_error(
     )
     assert code == 1
     assert "referer" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (
+            ["https://example.com/video.m3u8", "--from-page", "https://example.com/"],
+            "同時に指定できません",
+        ),
+        ([], "どちらかを指定してください"),
+        (["--from-page", "file:///tmp/page.html"], "--from-page"),
+        (
+            [
+                "--from-page",
+                "https://example.com/",
+                "--base-url",
+                "https://example.com/",
+            ],
+            "--base-url",
+        ),
+        (["--list-candidates"], "--from-page"),
+        (
+            ["--from-page", "https://example.com/", "--source-index", "1"],
+            "--source-index",
+        ),
+        (
+            ["--from-page", "https://example.com/", "--page-mode", "unknown"],
+            "--page-mode",
+        ),
+        (
+            ["--from-page", "https://example.com/", "--page-wait", "-1"],
+            "--page-wait",
+        ),
+        (
+            [
+                "--from-page",
+                "https://example.com/",
+                "--page-mode",
+                "static",
+                "--headed",
+            ],
+            "--headed",
+        ),
+    ],
+)
+def test_from_page_argument_validation(
+    arguments: list[str],
+    message: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(arguments) == 1
+    assert message in capsys.readouterr().err

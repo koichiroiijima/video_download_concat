@@ -7,6 +7,7 @@
 
 CLI が m3u8 を取得・解析し、セグメントを並列ダウンロードしたあと、
 ffmpeg の concat デマルチプレクサで MP4 に結合します。
+`--from-page` を指定した場合は、先に Webページから m3u8 の候補を探します。
 配布版では PyInstaller の onedir 形式で Python ランタイムを同梱し、
 ffmpeg は exe と同じフォルダに配置します。
 
@@ -18,6 +19,14 @@ cli.main
    ├─ config.find_config / load_config
    ├─ 引数と設定のマージ（CLI > 設定 > 既定）
    └─ cli.run
+        │
+        ├─ cli._discover_page（--from-page のとき）
+        │    ├─ page_source.discover_static（HTML / JS / iframe の静的解析）
+        │    └─ browser_cdp.discover_browser
+        │    │    ├─ Chrome / Edge / Chromium を起動
+        │    │    ├─ ws.WebSocket で CDP に接続
+        │    │    └─ Network イベントから m3u8 を収集
+        │    └─ page_source.select_candidate（番号指定 / 対話選択）
         │
         ├─ cli._load_playlist
         │    ├─ net.fetch_text_with_url / Path.read_text
@@ -81,8 +90,9 @@ cli.main
 │   ├── ffmpeg.py             concat リスト作成・ffmpeg 実行
 │   ├── ffmpeg_bootstrap.py   ffmpeg 探索・自動ダウンロード
 │   ├── ffmpeg_sources.py     配布元 URL・SHA256 の定義
-│   ├── page_source.py        Webページから m3u8 を探索（CLI 未接続）
-│   └── ws.py                 CDP 用の最小 WebSocket クライアント（CLI 未接続）
+│   ├── page_source.py        Webページから m3u8 を探索（静的解析・候補選択）
+│   ├── browser_cdp.py        Chrome / Edge を CDP で操作して m3u8 を検出
+│   └── ws.py                 CDP 用の最小 WebSocket クライアント
 └── tests/
     ├── test_cli.py
     ├── test_config.py
