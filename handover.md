@@ -236,11 +236,10 @@ uv run pytest tests/test_e2e.py -q
 - [ ] AES-128 暗号化 HLS に対応するか判断する（`cryptography` などの依存追加）。
 - [ ] fMP4（`EXT-X-MAP`）対応が必要か判断する。
 - [ ] ライブ配信の継続取得（ポーリング）が必要か判断する。
-- [ ] `page_source.py` を CLI に接続する（`--page-mode static` / `--source-index`、
-  設定ファイル項目、エラーメッセージの整合）。
-- [ ] `browser_cdp.py` を実装し、`ws.py` 経由で CDP から m3u8 URL を収集する
-  （ブラウザ方式）。
-- [ ] `page_source.py` / `ws.py` のテストを追加する。
+- [ ] ページ探索（`page_source.py` / `browser_cdp.py` / `ws.py`）のテストを追加する。
+- [ ] Windows 11 で `--from-page` のブラウザ方式を確認する（Edge / Chrome）。
+- [ ] 実際の動画ページで `auto` の静的解析 → ブラウザのフォールバックを確認する。
+- [ ] 必要ならページ探索の設定ファイル項目を追加する（現状は CLI のみ）。
 
 ## 8. 作業を始める前に
 
