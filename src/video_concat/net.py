@@ -38,6 +38,7 @@ def fetch_text(
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
     retries: int = 3,
+    max_bytes: int | None = None,
 ) -> str:
     """URL からテキストを取得する。一時的な失敗はリトライする。"""
     text, _ = fetch_text_with_url(
@@ -45,6 +46,7 @@ def fetch_text(
         headers=headers,
         timeout=timeout,
         retries=retries,
+        max_bytes=max_bytes,
     )
     return text
 
@@ -55,6 +57,7 @@ def fetch_text_with_url(
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
     retries: int = 3,
+    max_bytes: int | None = None,
 ) -> tuple[str, str]:
     """URL からテキストと、リダイレクト後の最終 URL を取得する。
 
@@ -71,7 +74,15 @@ def fetch_text_with_url(
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 final_url = response.geturl()
                 charset = response.headers.get_content_charset() or "utf-8"
-                text = response.read().decode(charset, errors="replace")
+                if max_bytes is None:
+                    data = response.read()
+                else:
+                    data = response.read(max_bytes + 1)
+                    if len(data) > max_bytes:
+                        raise DownloadError(
+                            f"応答が大きすぎます（上限 {max_bytes} バイト）: {url}"
+                        )
+                text = data.decode(charset, errors="replace")
                 return text, final_url
         except urllib.error.HTTPError as exc:
             last_error = DownloadError(f"{url}: HTTP {exc.code} {exc.reason}")
