@@ -10,30 +10,29 @@
 ```bash
 # 配布版
 video-concat SOURCE [OPTIONS]
-video-concat.exe SOURCE [OPTIONS]
+video-concat --from-page URL [OPTIONS]
+video-concat.exe --from-page URL [OPTIONS]
 
 # ソース実行
 uv run video-concat SOURCE [OPTIONS]
-uv run python -m video_concat SOURCE [OPTIONS]
+uv run python -m video_concat --from-page URL [OPTIONS]
 ```
 
 引数なしで実行した場合は、ヘルプを表示して終了コード 0 で終了します。
+`SOURCE` と `--from-page` はどちらか一方が必須で、同時には指定できません。
 
 ### 入力
 
 | 項目 | 内容 |
 | --- | --- |
 | `SOURCE` | `http://` / `https://` の m3u8 URL、ローカルの `.m3u8` ファイル、または `file://` URI |
+| `--from-page URL` | Webページから m3u8 を探す。`http://` / `https://` のみ。`--base-url` とは併用不可 |
 | マスタープレイリスト | `EXT-X-STREAM-INF` を解釈し、`--variant` で選択 |
 | メディアプレイリスト | `EXTINF` と URI 行を順に取得 |
 | 相対 URI | m3u8 の URL（ローカルなら `file://`）を基準に解決 |
 | `--base-url` | 相対 URI の基準を上書き（ローカル m3u8 を元の配信元から取得する場合など） |
 | `EXT-X-TOKEN` | 非標準。`--token-query` または `--token-header` で利用 |
 | Referer | 設定ファイルの `[http] referer`、または `-H "Referer: ..."` |
-
-Webページの URL を渡して m3u8 を自動検出する機能（`page_source.py`）は
-内部実装のみで、CLI からは利用できません。`--page-mode` / `--source-index` は
-未実装です。
 
 ### 出力
 
@@ -50,6 +49,15 @@ Webページの URL を渡して m3u8 を自動検出する機能（`page_source
 
 | オプション | 既定値 | 内容 |
 | --- | --- | --- |
+| `--from-page URL` | なし | Webページから m3u8 を探す（`http://` / `https://`） |
+| `--page-mode MODE` | `auto` | `auto` / `static` / `browser` |
+| `--page-wait SECONDS` | `5` | ブラウザでページを開いてから待つ秒数（0 以上） |
+| `--list-candidates` | 無効 | 見つかった候補を一覧表示して終了（`--from-page` 必須） |
+| `--source-index N` | なし | 使用する候補の番号（0 始まり、`--from-page` 必須） |
+| `--browser-path PATH` | 自動探索 | Chrome / Edge / Chromium の実行パス |
+| `--headed` | 無効 | ブラウザを画面表示ありで起動（デバッグ用） |
+| `--user-data-dir PATH` | 一時ディレクトリ | ブラウザのユーザーデータディレクトリ |
+| `--click-selector CSS` | なし | 再生ボタンなどをクリックする CSS セレクタ |
 | `--config PATH` | 自動探索 | 設定ファイルのパス |
 | `-o, --output` | `YYYYmmddHHMMSS.mp4` | 出力ファイル。拡張子がなければ `.mp4` を補う |
 | `--work-dir` | `<出力名>_segments` | セグメント保存先 |
@@ -70,6 +78,48 @@ Webページの URL を渡して m3u8 を自動検出する機能（`page_source
 | `-v, --verbose` | 無効 | デバッグログを表示 |
 | `-q, --quiet` | 無効 | 進捗と警告を抑制 |
 | `--version` | — | バージョンを表示 |
+
+### Webページから m3u8 を探す（`--from-page`）
+
+```bash
+# 候補を一覧表示
+video-concat --from-page https://example.com/watch/123 --list-candidates
+
+# 自動探索（静的解析 → ブラウザ）で 1 件に絞ってダウンロード
+video-concat --from-page https://example.com/watch/123 -o output.mp4
+
+# 候補を番号で指定
+video-concat --from-page https://example.com/watch/123 --source-index 1
+```
+
+- `--page-mode`:
+  - `auto`（既定）: 静的解析で有効な候補が見つかればそれを採用し、
+    無ければブラウザ方式にフォールバックします。
+  - `static`: HTML・インライン JS・同一オリジンの外部スクリプト・iframe の
+    静的解析のみ行います。`--page-wait` / `--browser-path` / `--headed` /
+    `--user-data-dir` / `--click-selector` とは併用できません。
+  - `browser`: Chrome / Edge / Chromium を CDP で操作し、ページの通信から
+    m3u8 を検出します。JavaScript で URL を生成するページ向けです。
+- 候補の選択:
+  - 有効な候補が 1 件なら自動選択します。
+  - 複数ある場合は `--source-index`（0 始まり）で指定します。
+  - 標準入力が対話端末なら番号入力もできます（空 Enter は最初の有効候補、
+    最大 3 回）。非対話で複数ある場合はエラーにします。
+- `--list-candidates`: 候補を一覧表示して終了します。取得失敗した候補も
+  理由付きで表示します。候補が 0 件の場合はエラー（終了コード 1）です。
+- ヘッダ:
+  - 検出後、`Referer` を最終ページ URL で補います。
+  - ブラウザ方式で実際に送られた `Referer` / `Origin` / `Cookie` / `User-Agent` は、
+    `-H` や設定ファイルで明示していない項目だけ補います。
+- ブラウザの探索順: `--browser-path` → 環境変数 `VIDEO_CONCAT_BROWSER` →
+  OS の既定インストール先 / `PATH`。Linux は `microsoft-edge` / `google-chrome` /
+  `chromium` など、Windows は Edge / Chrome / Chromium の標準的な場所を見ます。
+- `--user-data-dir` にログイン済みプロファイルを指定すると、認証が必要なページも
+  開ける場合があります（普段使いのプロファイルを汚さないよう注意）。
+- `--headed` は画面表示ありで起動します。原因調査用です。
+- `--click-selector` は再生ボタンなどをクリックする CSS セレクタです。
+- `--page-wait` はブラウザ方式でページを開いたあとの待ち時間（既定 5 秒）です。
+- ページ探索のオプションは CLI のみで、設定ファイルには項目がありません。
 
 ## 2. 設定ファイル
 

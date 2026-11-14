@@ -58,7 +58,6 @@ def test_invalid_config_returns_error(
             ["https://example.com/video.m3u8", "--from-page", "https://example.com/"],
             "同時に指定できません",
         ),
-        ([], "どちらかを指定してください"),
         (["--from-page", "file:///tmp/page.html"], "--from-page"),
         (
             [
@@ -71,7 +70,7 @@ def test_invalid_config_returns_error(
         ),
         (["--list-candidates"], "--from-page"),
         (
-            ["--from-page", "https://example.com/", "--source-index", "1"],
+            ["https://example.com/video.m3u8", "--source-index", "1"],
             "--source-index",
         ),
         (

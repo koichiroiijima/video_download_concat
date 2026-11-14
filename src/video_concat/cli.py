@@ -354,6 +354,13 @@ def _build_parser() -> argparse.ArgumentParser:
 def _validate_args(args: argparse.Namespace) -> None:
     if args.source is not None and args.from_page is not None:
         raise ValueError("SOURCE と --from-page は同時に指定できません")
+    if args.list_candidates and args.from_page is None:
+        raise ValueError("--list-candidates は --from-page と一緒に指定してください")
+    if args.source_index is not None:
+        if args.from_page is None:
+            raise ValueError("--source-index は --from-page と一緒に指定してください")
+        if args.source_index < 0:
+            raise ValueError("--source-index は 0 以上を指定してください")
     if args.source is None and args.from_page is None:
         raise ValueError(
             "m3u8 の URL（SOURCE）か --from-page のどちらかを指定してください"
@@ -367,13 +374,6 @@ def _validate_args(args: argparse.Namespace) -> None:
             raise ValueError(
                 "--from-page と --base-url は同時に指定できません"
             )
-    if args.list_candidates and args.from_page is None:
-        raise ValueError("--list-candidates は --from-page と一緒に指定してください")
-    if args.source_index is not None:
-        if args.from_page is None:
-            raise ValueError("--source-index は --from-page と一緒に指定してください")
-        if args.source_index < 0:
-            raise ValueError("--source-index は 0 以上を指定してください")
     if args.page_mode is not None and args.page_mode not in {
         "auto",
         "static",
