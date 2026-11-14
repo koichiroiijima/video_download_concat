@@ -27,8 +27,8 @@ Python 不要の配布版（PyInstaller onedir）を追加した。
 | 設定ファイル（Referer ほか） | 実装済み |
 | ffmpeg の同梱探索・初回自動ダウンロード | 実装済み |
 | モック HLS サーバー（HTTP / Referer 検査） | 実装済み・確認済み |
-| Webページからの m3u8 探索（`page_source.py`） | 実装済み・**CLI 未接続** |
-| WebSocket クライアント（`ws.py`、CDP 用） | 実装済み・CLI 未接続 |
+| Webページからの m3u8 探索（`--from-page`） | 実装済み（静的解析 + ブラウザ） |
+| ブラウザ方式（`browser_cdp.py` / `ws.py`） | 実装済み・手動確認のみ |
 | PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
 | Linux 配布版のビルド・E2E | 確認済み（zip 展開後も確認） |
 | Windows 11 配布版のビルド・E2E | **未確認（Windows 実機が必要）** |
@@ -163,15 +163,20 @@ uv run pytest tests/test_e2e.py -q
     （リトライ対象外）。
   - 既定は `None`（上限なし）。CLI からの指定はまだ無いため、利用者向けの
     振る舞いに変化はない。テストも未追加。
-- 2026-11-14: Webページからの m3u8 探索と WebSocket クライアントを追加
-  （いずれも CLI 未接続）。
+- 2026-11-14: Webページからの m3u8 探索を追加。
   - `src/video_concat/page_source.py` — HTML・インライン JS・同一オリジンの
     外部スクリプト・iframe を静的に走査して m3u8 候補を抽出し、取得して
     プレイリストか検証する。候補の一覧表示・対話選択にも対応。
+  - `src/video_concat/browser_cdp.py` — Chrome / Edge / Chromium を CDP で操作し、
+    ページの通信から m3u8 を検出する。ヘッドレス起動（`--headed` で表示あり）、
+    再生操作、Cookie / Referer の再利用に対応。
   - `src/video_concat/ws.py` — CDP 用の最小 WebSocket クライアント
     （RFC 6455、標準ライブラリのみ、`ws://` のみ）。
-  - `cli.py` からの参照、`browser_cdp.py`、テストは未実装・未追加。
-    利用者向けの振る舞いに変化はない（`uv run pytest` は 36 passed のまま）。
+  - `cli.py` — `--from-page` / `--page-mode` / `--page-wait` / `--list-candidates` /
+    `--source-index` / `--browser-path` / `--headed` / `--user-data-dir` /
+    `--click-selector` を追加。`SOURCE` は任意引数になり、`--from-page` と排他。
+    `auto` は静的解析 → ブラウザの順。
+  - ページ探索の自動テストは未追加（`uv run pytest` は 36 passed のまま）。
 
 ## 6. 既知の制約・注意点
 
@@ -208,12 +213,16 @@ uv run pytest tests/test_e2e.py -q
 - 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。
 - `list.cmd` は 4 桁ゼロ埋めのため 10,000 セグメント以上では破綻するが、
   本ツールはプレイリスト順を使うため影響しない。
-- `page_source.py` / `ws.py` は CLI から参照されていない。利用者向けの
-  振る舞いは変わらない。
-- `browser_cdp.py` は未実装。`page_source.select_candidate()` のメッセージが
-  参照する `--page-mode` / `--source-index` も CLI に存在しない。
-  CLI へ接続するときに整合させる。
-- `page_source.py` / `ws.py` にテストは未追加（`uv run pytest` は 36 passed のまま）。
+- `page_source.py` / `browser_cdp.py` / `ws.py`（ページ探索）は自動テスト未追加。
+  確認は手動で行う。ブラウザ方式を CI で回すにはヘッドレスブラウザの導入が必要。
+- ブラウザ方式は利用者環境の Chrome / Edge / Chromium が必要。配布物には同梱しない。
+  見つからない場合は `--browser-path` か環境変数 `VIDEO_CONCAT_BROWSER` で指定する。
+- `ws.py` は `ws://` のみ対応（`wss://` は未対応）。CDP 用途の最小実装。
+- ページ探索のオプションは CLI のみで、設定ファイルには項目がない。
+- `--user-data-dir` を指定した場合、ブラウザのプロファイルは残る
+  （指定しない場合の一時ディレクトリは終了時に削除される）。
+- ブラウザが送った Cookie をセグメント取得に再利用する。`-v` のログに
+  秘密情報を出さないよう注意する。
 
 ## 7. 次にやるとよさそうな作業 (候補)
 
