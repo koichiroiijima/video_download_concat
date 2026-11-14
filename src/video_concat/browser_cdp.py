@@ -202,11 +202,12 @@ class CdpConnection:
         elif "id" in message:
             self._responses[message.get("id")] = message
 
-    def _next_message(self, timeout: float) -> dict:
+    def _next_message(self, timeout: float) -> dict | None:
+        """次の CDP メッセージを返す。時間内に届かなければ ``None`` を返す。"""
         try:
             item = self._queue.get(timeout=timeout)
-        except queue.Empty as exc:
-            raise CdpError("CDP の応答がタイムアウトしました") from exc
+        except queue.Empty:
+            return None
         if isinstance(item, _Closed):
             raise CdpError(f"ブラウザとの接続が切れました: {item.error}")
         if not isinstance(item, str):
@@ -242,6 +243,8 @@ class CdpConnection:
             if remaining <= 0:
                 raise CdpError(f"CDP コマンドがタイムアウトしました: {method}")
             message = self._next_message(remaining)
+            if message is None:
+                raise CdpError(f"CDP コマンドがタイムアウトしました: {method}")
             if "method" in message:
                 self._dispatch(message)
             else:
@@ -260,6 +263,8 @@ class CdpConnection:
             if remaining <= 0:
                 return
             message = self._next_message(remaining)
+            if message is None:
+                return
             if "method" in message:
                 self._dispatch(message)
             else:

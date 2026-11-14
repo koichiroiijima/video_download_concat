@@ -236,6 +236,15 @@ auto_download = false
 
 | オプション | 説明 |
 | --- | --- |
+| `--from-page URL` | 動画ページから m3u8 を探す |
+| `--page-mode MODE` | `auto` / `static` / `browser`（既定: `auto`） |
+| `--page-wait SECONDS` | ブラウザでページを開いて待つ秒数（既定: 5） |
+| `--list-candidates` | 見つかった候補を一覧表示して終了 |
+| `--source-index N` | 使用する候補の番号（0 始まり） |
+| `--browser-path PATH` | Chrome / Edge / Chromium の実行パス |
+| `--headed` | ブラウザを画面表示ありで起動（確認用） |
+| `--user-data-dir PATH` | ブラウザのユーザーデータディレクトリ |
+| `--click-selector CSS` | クリックする要素の CSS セレクタ |
 | `--config PATH` | 設定ファイルを指定 |
 | `-o, --output` | 出力ファイル名（既定: `YYYYmmddHHMMSS.mp4`） |
 | `--work-dir` | セグメントの保存先（既定: `<出力名>_segments`） |
@@ -262,6 +271,9 @@ auto_download = false
 | 症状 | 確認すること |
 | --- | --- |
 | `HTTP 403 Forbidden` | Referer が配信元のページと一致しているか確認してください。`-H "Referer: ..."` または `[http] referer` で指定します。`User-Agent` や `Accept` が必要な場合もあります。Cloudflare などのボット対策が有効な配信元では、Referer を付けても取得できないことがあります。 |
+| `Chrome / Edge / Chromium が見つかりません` | `--browser-path` で実行パスを指定するか、ブラウザをインストールしてください。 |
+| ページから m3u8 が見つからない | `--list-candidates` で候補を確認してください。`--page-mode browser`、`--headed`、`--click-selector` も試してください。 |
+| 候補が複数ある | `--source-index` で番号を指定してください（`--list-candidates` で番号を確認できます）。 |
 | `EXT-X-TOKEN` の警告が出る | `--token-query NAME` または `--token-header NAME` で付与方法を指定してください。付与方法は配信元ごとに異なります。 |
 | セグメントの一部が失敗する | `--retries` を増やす、`--concurrency` を下げる、時間をおいて再実行してください。取得済みのセグメントは再利用されます。 |
 | `ffmpeg が見つかりません` | `--ffmpeg PATH` を指定するか、exe と同じフォルダに ffmpeg を置いてください。ソース実行では自動ダウンロードされません。 |
@@ -276,6 +288,7 @@ auto_download = false
 - Python 3.10 以上
 - [uv](https://docs.astral.sh/uv/)
 - ffmpeg（ソース実行時は `PATH` 上にあるか `--ffmpeg` で指定）
+- Chrome / Edge / Chromium（`--from-page` のブラウザ方式を使う場合のみ）
 - Node.js 18 以上（モック HLS サーバーを使う場合のみ。npm パッケージは不要）
 
 ```bash
@@ -395,6 +408,10 @@ Windows 版は Linux からクロスビルドできません。必ず Windows 11
   取得できない場合があります。本ツールはボット対策を回避する機能を持ちません。
 - Cookie やセッショントークンが必要な配信元は、`-H` や `--token-query` /
   `--token-header` で対応できる範囲に限られます。
+- `--from-page` の候補検出はページの作りに依存します。動画が別オリジンの
+  iframe 内にある場合や、独自の難読化をしている場合は見つからないことがあります。
+- ブラウザ方式は Chrome / Edge / Chromium が必要です（配布物には同梱していません）。
+  ブラウザ方式の自動テストは未実施です。
 
 ## 6. 注意
 
