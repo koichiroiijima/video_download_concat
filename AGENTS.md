@@ -85,6 +85,12 @@ PY
 - ffmpeg の自動ダウンロードは配布版のみ。ソース実行では `--ffmpeg` / `PATH` を使う。
 - 自動ダウンロードの URL・SHA256 は `ffmpeg_sources.py` に固定する。
   変更時はライセンス情報も更新する。
+- `page_source.py`（Webページからの m3u8 探索）と `ws.py`（CDP 用 WebSocket）は
+  **CLI 未接続**。`--page-mode` / `--source-index` は未実装なので、実装済みとして
+  ドキュメントに書かない。接続時に `select_candidate()` のメッセージと
+  オプション名を揃える。
+- `browser_cdp.py` は未実装。ブラウザ方式を追加するときに `ws.py` を使う。
+- 新モジュールでも実行時依存は増やさない（`ws.py` は標準ライブラリのみ）。
 - exe フォルダに書き込めない場合はエラーにする（フォールバックしない）。
 - Windows では `list.txt` のパスを `/` に正規化し、UTF-8 / LF で書く。
 - 引数なし実行はヘルプ表示・終了コード 0。

@@ -27,6 +27,8 @@ Python 不要の配布版（PyInstaller onedir）を追加した。
 | 設定ファイル（Referer ほか） | 実装済み |
 | ffmpeg の同梱探索・初回自動ダウンロード | 実装済み |
 | モック HLS サーバー（HTTP / Referer 検査） | 実装済み・確認済み |
+| Webページからの m3u8 探索（`page_source.py`） | 実装済み・**CLI 未接続** |
+| WebSocket クライアント（`ws.py`、CDP 用） | 実装済み・CLI 未接続 |
 | PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
 | Linux 配布版のビルド・E2E | 確認済み（zip 展開後も確認） |
 | Windows 11 配布版のビルド・E2E | **未確認（Windows 実機が必要）** |
@@ -161,6 +163,15 @@ uv run pytest tests/test_e2e.py -q
     （リトライ対象外）。
   - 既定は `None`（上限なし）。CLI からの指定はまだ無いため、利用者向けの
     振る舞いに変化はない。テストも未追加。
+- 2026-11-14: Webページからの m3u8 探索と WebSocket クライアントを追加
+  （いずれも CLI 未接続）。
+  - `src/video_concat/page_source.py` — HTML・インライン JS・同一オリジンの
+    外部スクリプト・iframe を静的に走査して m3u8 候補を抽出し、取得して
+    プレイリストか検証する。候補の一覧表示・対話選択にも対応。
+  - `src/video_concat/ws.py` — CDP 用の最小 WebSocket クライアント
+    （RFC 6455、標準ライブラリのみ、`ws://` のみ）。
+  - `cli.py` からの参照、`browser_cdp.py`、テストは未実装・未追加。
+    利用者向けの振る舞いに変化はない（`uv run pytest` は 36 passed のまま）。
 
 ## 6. 既知の制約・注意点
 
@@ -197,6 +208,12 @@ uv run pytest tests/test_e2e.py -q
 - 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。
 - `list.cmd` は 4 桁ゼロ埋めのため 10,000 セグメント以上では破綻するが、
   本ツールはプレイリスト順を使うため影響しない。
+- `page_source.py` / `ws.py` は CLI から参照されていない。利用者向けの
+  振る舞いは変わらない。
+- `browser_cdp.py` は未実装。`page_source.select_candidate()` のメッセージが
+  参照する `--page-mode` / `--source-index` も CLI に存在しない。
+  CLI へ接続するときに整合させる。
+- `page_source.py` / `ws.py` にテストは未追加（`uv run pytest` は 36 passed のまま）。
 
 ## 7. 次にやるとよさそうな作業 (候補)
 
@@ -210,6 +227,11 @@ uv run pytest tests/test_e2e.py -q
 - [ ] AES-128 暗号化 HLS に対応するか判断する（`cryptography` などの依存追加）。
 - [ ] fMP4（`EXT-X-MAP`）対応が必要か判断する。
 - [ ] ライブ配信の継続取得（ポーリング）が必要か判断する。
+- [ ] `page_source.py` を CLI に接続する（`--page-mode static` / `--source-index`、
+  設定ファイル項目、エラーメッセージの整合）。
+- [ ] `browser_cdp.py` を実装し、`ws.py` 経由で CDP から m3u8 URL を収集する
+  （ブラウザ方式）。
+- [ ] `page_source.py` / `ws.py` のテストを追加する。
 
 ## 8. 作業を始める前に
 

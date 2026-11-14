@@ -701,7 +701,7 @@ def run(args: argparse.Namespace, app_config: AppConfig) -> None:
         print(f"セグメントを保持しました: {work_dir}", file=sys.stderr)
     else:
         protected_paths: set[Path] = set()
-        local_source = _local_path(args.source)
+        local_source = _local_path(source)
         if local_source is not None:
             protected_paths.add(local_source.resolve())
         if save_playlist is not None:
