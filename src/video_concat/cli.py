@@ -449,10 +449,15 @@ def _merge_candidate_headers(
     *,
     allow_user_agent: bool,
 ) -> None:
-    """ブラウザが実際に送ったヘッダを、明示指定がない項目だけ補う。"""
+    """ブラウザが実際に送ったヘッダを、明示指定がない項目だけ補う。
+
+    ``allow_user_agent`` が真なら、既定の User-Agent をブラウザの値で置き換える。
+    """
     for name, value in candidate_headers.items():
         canonical = canonical_header(name)
-        if canonical == "User-Agent" and not allow_user_agent:
+        if canonical == "User-Agent":
+            if allow_user_agent:
+                headers["User-Agent"] = value
             continue
         headers.setdefault(canonical, value)
 

@@ -108,9 +108,12 @@ video-concat --from-page https://example.com/watch/123 --source-index 1
 - `--list-candidates`: 候補を一覧表示して終了します。取得失敗した候補も
   理由付きで表示します。候補が 0 件の場合はエラー（終了コード 1）です。
 - ヘッダ:
-  - 検出後、`Referer` を最終ページ URL で補います。
-  - ブラウザ方式で実際に送られた `Referer` / `Origin` / `Cookie` / `User-Agent` は、
+  - `-H` や設定ファイルで明示した Referer はそのまま使います。明示していない場合は、
+    ブラウザ方式で実際に送られた Referer、無ければ最終ページ URL の順で補います。
+  - ブラウザ方式で実際に送られた `Referer` / `Origin` / `Cookie` は、
     `-H` や設定ファイルで明示していない項目だけ補います。
+    `User-Agent` も控え、`--user-agent` や設定ファイルで明示していなければ
+    ブラウザの値を使います（既定値より優先）。
 - ブラウザの探索順: `--browser-path` → 環境変数 `VIDEO_CONCAT_BROWSER` →
   OS の既定インストール先 / `PATH`。Linux は `microsoft-edge` / `google-chrome` /
   `chromium` など、Windows は Edge / Chrome / Chromium の標準的な場所を見ます。
@@ -299,7 +302,7 @@ Playwright の Chromium キャッシュ、`PATH` 上の Chrome / Edge / Chromium
 
 ### 実施済みの確認
 
-- `uv run pytest` → 67 passed
+- `uv run pytest` → 69 passed
 - Linux 配布版のビルドと `--help` / 引数なしヘルプ
 - 配布 zip を展開した状態でも E2E を実行し、Referer 送信・結合・後始末を確認
 - 配布 zip が実行ファイルの権限（`0755`）を記録していることを確認
@@ -331,6 +334,12 @@ node tools/mock-hls-server/server.mjs --referer https://example.com/
 | パストラバーサル | 配信ディレクトリ外は 403 |
 | 対応メソッド | `GET` / `HEAD`（それ以外は 405） |
 | メディア生成 | ffmpeg で 1 秒の MPEG-TS を 6 個（既定） |
+
+Referer 検査を有効にした状態で `/player.html` を使う `--from-page` を実行する場合は、
+Referer を明示していなければ m3u8 の取得にページ URL（例:
+`http://127.0.0.1:8080/player.html`）が使われるため、ページ URL も `--referer` に
+指定します。許可済みの Referer を `-H "Referer: ..."` や `[http] referer` で
+明示する方法でも構いません。
 
 生成物 (`tools/mock-hls-server/media/`) は `.gitignore` の対象です。
 サーバーのオプション（`--host` / `--port` / `--dir` / `--referer` / `-q`）と

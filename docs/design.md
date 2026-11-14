@@ -256,9 +256,11 @@ cli.main
     空 Enter は最初の有効候補。選択できなければ `DiscoveryError`。
 - `format_candidate()`: 一覧表示用に、マスター（Variant 数）/ メディア
   （セグメント数・合計時間）/ 取得失敗を整形する。`--list-candidates` で使う。
-- 候補を選んだあと、`cli.run` が `Referer` を最終ページ URL で補い、
-  候補に付いたヘッダ（ブラウザが送った Referer / Origin / Cookie / User-Agent）を
-  明示指定の無い項目だけ `setdefault` でマージする。
+- 候補を選んだあと、`cli.run` が候補に付いたヘッダ（ブラウザが送った
+  Referer / Origin / Cookie / User-Agent）を明示指定の無い項目だけマージする。
+  `Referer` が無ければページ URL で補う（優先順位は
+  明示指定 > 候補ヘッダ > ページ URL）。`User-Agent` は明示指定が無ければ
+  既定値よりブラウザの値を優先する。
 
 ### `browser_cdp.py`
 
@@ -335,7 +337,8 @@ cli.main
 2. `--from-page` の場合は Webページから m3u8 の候補を探索する。
    `auto` は静的解析で有効な候補が見つかればそれを採用し、無ければブラウザ方式に
    フォールバックする。候補が 1 件なら自動選択、複数なら `--source-index` か
-   対話で選ぶ。選んだ URL を取得元にし、Referer と候補ヘッダを補う。
+   対話で選ぶ。選んだ URL を取得元にし、候補ヘッダを明示指定の無い項目だけ補う。
+   Referer が無ければ最終ページ URL で補う。
    `--list-candidates` は候補を一覧表示して終了する。
 3. 出力名を決定（未指定なら `YYYYmmddHHMMSS.mp4`）。
 4. m3u8 を取得して `Playlist` に変換。マスターなら Variant を選択して再取得。
@@ -369,7 +372,7 @@ cli.main
   同梱せず、Python の実行時依存も増やさない。CDP の WebSocket は `ws.py` の
   最小実装で扱う。
 - **ブラウザが送ったヘッダを再利用する**。Referer / Origin / Cookie / User-Agent を
-  候補に付け、明示指定が無い項目だけ補う。Referer は最終ページ URL で補う。
+  候補に付け、明示指定が無い項目だけ補う。Referer は未指定なら最終ページ URL でも補う。
 - **ブラウザ方式の E2E テストは、ヘッドレスブラウザが見つかる環境でのみ実行する**。
   `VIDEO_CONCAT_TEST_BROWSER`、Playwright の Chromium キャッシュ、
   `PATH` 上の Chrome / Edge / Chromium の順に探し、無ければスキップする。
@@ -413,3 +416,8 @@ cli.main
 - 2026-11-14: モック HLS サーバーに `/player.html` を追加。
   `<video>` で `/master.m3u8` を読み込み、`--from-page` の静的解析と
   ブラウザ方式を手動で確認できる。Referer 検査の対象外。
+- 2026-11-14: `--from-page` のヘッダのマージを修正。
+  - `Referer` は 明示指定 > ブラウザが送った値 > 最終ページ URL の順で補う。
+  - `User-Agent` は `--user-agent` / 設定ファイルで明示していなければ、
+    既定値ではなくブラウザが送った値を使う。
+  - `tests/test_cli.py` に `_merge_candidate_headers()` のテストを追加。

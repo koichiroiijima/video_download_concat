@@ -32,7 +32,7 @@ Python 不要の配布版（PyInstaller onedir）を追加した。
 | PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
 | Linux 配布版のビルド・E2E | 確認済み（zip 展開後も確認） |
 | Windows 11 配布版のビルド・E2E | **未確認（Windows 実機が必要）** |
-| 自動テスト | 67 passed（ブラウザ E2E は環境によりスキップ） |
+| 自動テスト | 69 passed（ブラウザ E2E は環境によりスキップ） |
 | AES-128 / fMP4 / BYTERANGE | 未対応（明示エラー） |
 
 ## 3. 現在の実行状態
@@ -65,7 +65,8 @@ Windows 11 では PowerShell から:
 
 ```bash
 node tools/mock-hls-server/generate-media.mjs
-node tools/mock-hls-server/server.mjs --referer https://example.com/
+node tools/mock-hls-server/server.mjs --referer https://example.com/ \
+  --referer http://127.0.0.1:8080/player.html
 # 再生ページ: http://127.0.0.1:8080/player.html（--from-page の確認用）
 ```
 
@@ -187,11 +188,19 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
   - テストを追加: `tests/test_page_source.py`（静的解析・候補選択）、
     `tests/test_ws.py`（WebSocket のハンドシェイク・分割フレーム・マスク）、
     `tests/test_e2e.py`（静的解析 E2E、ブラウザ方式の Cookie / Referer E2E）。
-    `uv run pytest` は 67 passed（ブラウザ E2E は環境によりスキップ）。
+    `uv run pytest` は 69 passed（ブラウザ E2E は環境によりスキップ）。
   - `CdpConnection.pump()` がイベント待ちのタイムアウトを例外にしていたため、
     待ち時間の経過として扱うよう修正。ブラウザ E2E はこれで通るようになった。
   - モック HLS サーバーに `/player.html` を追加。`<video>` で `/master.m3u8` を
     読み込み、`--from-page` の静的解析・ブラウザ方式を手動で確認できる。
+  - `--from-page` のヘッダのマージを修正。`User-Agent` は明示指定が無ければ
+    既定値ではなくブラウザが送った値を使う（テスト追加で 69 passed）。
+- 2026-11-14: `/player.html` を使う `--from-page` の Referer 挙動をドキュメントに追記
+  （実装の変更はなし）。
+  - Referer を明示しなければ、候補検証と取得にページ URL が Referer として使われる。
+  - Referer 検査を有効にしたモックサーバーでは、ページ URL も `--referer` に含めるか、
+    許可済みの Referer を `-H` / `[http] referer` で明示する。
+  - AGENTS / handover のモックサーバー起動例にもページ URL の `--referer` を追加した。
 
 ## 6. 既知の制約・注意点
 
@@ -224,6 +233,8 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
 - モック HLS サーバーは Node.js 18 以上が必要で、開発時のみ使用する。
   生成した `tools/mock-hls-server/media/` はコミットしない。
   `/player.html` は `--from-page` の確認用で、Referer 検査の対象外。
+  Referer 検査を有効にする場合は、ページ URL も許可 Referer に含める
+  （または許可済みの Referer を明示する）。
 - ライブ配信は実行時点のスナップショットのみ。
 - セグメント URL にトークンが含まれる場合、`-v` のログに URL が出る可能性がある。
 - 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。

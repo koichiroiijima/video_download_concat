@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from video_concat.cli import main
+from video_concat.cli import _merge_candidate_headers, main
 
 
 def test_no_arguments_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
@@ -100,3 +100,33 @@ def test_from_page_argument_validation(
 ) -> None:
     assert main(arguments) == 1
     assert message in capsys.readouterr().err
+
+
+def test_merge_candidate_headers_prefers_explicit_values() -> None:
+    headers = {
+        "Referer": "https://explicit.example/",
+        "User-Agent": "explicit-agent",
+        "Cookie": "explicit=1",
+    }
+    candidate = {
+        "Referer": "https://browser.example/",
+        "Origin": "https://browser.example",
+        "Cookie": "browser=1",
+        "User-Agent": "browser-agent",
+    }
+
+    _merge_candidate_headers(headers, candidate, allow_user_agent=False)
+
+    assert headers["Referer"] == "https://explicit.example/"
+    assert headers["User-Agent"] == "explicit-agent"
+    assert headers["Cookie"] == "explicit=1"
+    assert headers["Origin"] == "https://browser.example"
+
+
+def test_merge_candidate_headers_uses_browser_user_agent() -> None:
+    headers = {"User-Agent": "default-agent"}
+    candidate = {"User-Agent": "browser-agent"}
+
+    _merge_candidate_headers(headers, candidate, allow_user_agent=True)
+
+    assert headers["User-Agent"] == "browser-agent"

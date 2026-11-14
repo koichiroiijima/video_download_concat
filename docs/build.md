@@ -178,6 +178,8 @@ E2E:
 1. ローカル HTTP サーバーで m3u8 と合成 TS を配信する。
    `tools/mock-hls-server/` を使うと Referer 検査（403）も確認できる。
    `/player.html` を使うと `--from-page` も確認できる。
+   Referer 検査を有効にしたまま `--from-page` を使う場合は、ページ URL を
+   許可 Referer（`--referer`）に含めるか、許可済みの Referer を設定する。
 2. `video-concat.ini` に Referer を設定する。
 3. 配布版で実行し、MP4 が作成されることを確認する。
 4. サーバー側で m3u8 と各セグメントに Referer が届くことを確認する。

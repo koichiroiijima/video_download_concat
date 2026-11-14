@@ -118,9 +118,10 @@ video-concat.exe --from-page "https://example.com/watch/123" --source-index 1
   見つからない場合は `--browser-path` で実行パスを指定してください。
 - 候補が 1 件なら自動で選びます。複数あるときは `--source-index` で指定します。
   対話端末で実行している場合は番号を入力できます。
-- Referer は自動でページの URL を設定します。ログインが必要なページでは
-  `--user-data-dir` にログイン済みのブラウザプロファイルを指定すると
-  開ける場合があります。
+- Referer を明示していない場合は、ページの URL を自動で設定します
+  （`-H "Referer: ..."` や `[http] referer` を指定した場合はそちらが優先されます）。
+  ログインが必要なページでは `--user-data-dir` にログイン済みのブラウザプロファイルを
+  指定すると開ける場合があります。
 - 再生ボタンのクリックが必要な場合は `--click-selector` に CSS セレクタを
   指定します。ブラウザの画面を見ながら確認したいときは `--headed` を使います。
 - `--page-wait` でページを開いてから待つ秒数を変更できます（既定 5 秒）。
@@ -338,15 +339,24 @@ Referer がない場合・一致しない場合は 403 になり、`video-concat
 `/player.html` は `<video>` で `/master.m3u8` を読み込む再生ページです。
 `--from-page` の静的解析・ブラウザ方式の手動確認に使えます（Referer 検査の対象外）。
 
+Referer 検査を有効にしたサーバーで `--from-page` を使う場合、Referer を
+明示していなければ m3u8 の取得にはページ URL が Referer として使われます。
+許可する Referer にページ URL（例: `http://127.0.0.1:8080/player.html`）を
+含めるか、`-H "Referer: ..."` / `[http] referer` で許可済みの Referer を
+指定してください。Referer 検査を有効にしたまま確認する場合は、次のように起動します。
+
 ```bash
+# 1. Referer 検査を有効にして起動（別ターミナル）
+node tools/mock-hls-server/server.mjs \
+  --referer https://example.com/ \
+  --referer http://127.0.0.1:8080/player.html
+
+# 2. 再生ページから m3u8 を探してダウンロード
 uv run video-concat --from-page "http://127.0.0.1:8080/player.html" \
   --page-mode static \
   --ffmpeg vendor/ffmpeg/linux-x86_64/ffmpeg \
   -o /tmp/from-page.mp4
 ```
-
-Referer 検査を有効にしている場合は、許可する Referer にページ URL
-（例: `http://127.0.0.1:8080/player.html`）を含めて起動してください。
 
 詳細は [tools/mock-hls-server/README.md](tools/mock-hls-server/README.md) を参照してください。
 
