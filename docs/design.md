@@ -231,6 +231,19 @@ cli.main
   - 絶対 / プロトコル相対、引用符内の相対、ルート相対の 3 種類を正規表現で拾う。
   - `http://` / `https://` のみ残し、`#fragment` を落として重複排除、出現順を保つ。
   - 末尾の `),.;]}>` などは URL から除去する。
+  - 難読化された JavaScript は先に展開してから走査する
+    （`decode_obfuscated_javascript()`、後述）。
+- `decode_obfuscated_javascript()`（`extract_m3u8_urls()` から利用）:
+  - Dean Edwards の packer（`eval(function(p,a,c,k,e,d){...}('...',a,c,
+    '...'.split('|'),0,{}))`）を静的に展開する。JavaScript は実行しない。
+  - `_PACKER_CALL_RE` は引数リスト先頭の文字列だけを対象にし、
+    関数本体の `new RegExp('\b'+...)` などを取り違えない。
+  - `_unpack()` はキーワード表を基数 `a`（`0-9a-zA-Z`、最大 62）で引き、
+    `\b\w+\b` の各トークンを置換する。
+  - `_unescape_js()` は文字列リテラル内の `\'`・`\\`・`\xXX`・`\uXXXX`・
+    `\u{...}`・8 進を戻す。
+  - 多重化に備えて最大 3 段まで、1 つのテキストから最大 20 呼び出しまで展開する。
+  - 展開はエスケープ解釈より先に行う（`\u0027` などでリテラルが壊れないように）。
 - `_Collector`（内部）:
   - 検出元ラベルは `インラインJS`、`HTML`、`スクリプト: <URL>`。
   - 外部スクリプトは**同一オリジン**のみ取得する。iframe は `http` / `https` なら辿る。
@@ -373,6 +386,9 @@ cli.main
   最小実装で扱う。
 - **ブラウザが送ったヘッダを再利用する**。Referer / Origin / Cookie / User-Agent を
   候補に付け、明示指定が無い項目だけ補う。Referer は未指定なら最終ページ URL でも補う。
+- **定番の難読化（Dean Edwards の packer）は静的解析で展開する**。
+  実行を伴わずに URL を取り出せるため、ブラウザ方式に落ちる前に候補を見つけられる。
+  ただし独自の難読化や実行時の URL 生成までは追わない（ブラウザ方式の役割）。
 - **ブラウザ方式の E2E テストは、ヘッドレスブラウザが見つかる環境でのみ実行する**。
   `VIDEO_CONCAT_TEST_BROWSER`、Playwright の Chromium キャッシュ、
   `PATH` 上の Chrome / Edge / Chromium の順に探し、無ければスキップする。
@@ -421,3 +437,9 @@ cli.main
   - `User-Agent` は `--user-agent` / 設定ファイルで明示していなければ、
     既定値ではなくブラウザが送った値を使う。
   - `tests/test_cli.py` に `_merge_candidate_headers()` のテストを追加。
+- 2026-11-14: 難読化 JavaScript（Dean Edwards の packer）の展開に対応。
+  - `page_source.decode_obfuscated_javascript()` / `_decode_packer_calls()` /
+    `_unpack()` / `_unescape_js()` / `_to_base()` を追加。
+  - `extract_m3u8_urls()` が展開結果も走査するように変更。
+    `--page-mode static` でも定番の packer で隠された m3u8 を見つけられる。
+  - `tests/test_page_source.py` に packer の展開・URL 抽出・往復のテストを追加。

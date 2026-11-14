@@ -201,6 +201,13 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
   - Referer 検査を有効にしたモックサーバーでは、ページ URL も `--referer` に含めるか、
     許可済みの Referer を `-H` / `[http] referer` で明示する。
   - AGENTS / handover のモックサーバー起動例にもページ URL の `--referer` を追加した。
+- 2026-11-14: 難読化 JavaScript（Dean Edwards の packer）の展開に対応。
+  - `page_source.decode_obfuscated_javascript()` などを追加し、
+    `extract_m3u8_urls()` が展開結果も走査するようにした。
+  - `missav.fans` のような `eval(function(p,a,c,k,e,d){...}('...',15,15,
+    '...'.split('|'),0,{}))` 形式のページで、`--page-mode static`
+    （`--from-page`）でも m3u8 を検出できることを確認した。
+  - テストを追加して 76 passed。
 
 ## 6. 既知の制約・注意点
 

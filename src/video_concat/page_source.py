@@ -73,6 +73,26 @@ class DiscoveryResult:
 _UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9a-fA-F]{4})")
 _HEX_ESCAPE_RE = re.compile(r"\\x([0-9a-fA-F]{2})")
 
+# ``eval(function(p,a,c,k,e,d){...}('...',a,c,'...'.split('|'),0,{}))``
+# 形式（Dean Edwards の packer）の引数を取り出す。
+# 関数本体の ``new RegExp('\\b'+...)`` などを取り違えないよう、
+# 引数リストの開始括弧 ``(`` の直後にある文字列だけを対象にする。
+_JS_STRING = r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\""
+_PACKER_CALL_RE = re.compile(
+    r"\(\s*(?P<p>" + _JS_STRING + r")\s*,\s*"
+    r"(?P<a>\d+)\s*,\s*(?P<c>\d+)\s*,\s*"
+    r"(?P<k>" + _JS_STRING + r")\s*\.\s*split\s*\(\s*"
+    r"['\"]\|['\"]\s*\)\s*,\s*\d+\s*,\s*\{\s*\}\s*\)",
+    re.DOTALL,
+)
+_BASE_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_JS_ESCAPE_RE = re.compile(
+    r"\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[0-7]{1,3}|.)",
+    re.DOTALL,
+)
+MAX_PACKER_DEPTH = 3
+MAX_PACKER_CALLS = 20
+
 # 絶対 URL / プロトコル相対 URL
 _ABSOLUTE_RE = re.compile(
     r"(?:https?:)?//[^\s\"'<>\\]+?\.m3u8(?:[?#][^\s\"'<>\\]*)?",
@@ -102,6 +122,98 @@ def _decode_escapes(text: str) -> str:
     return html.unescape(text)
 
 
+def _unescape_js(text: str) -> str:
+    """JavaScript の文字列リテラル内のエスケープを戻す。"""
+
+    def replace(match: re.Match[str]) -> str:
+        escape = match.group(1)
+        if escape.startswith("u{"):
+            digits = escape[2:-1]
+            try:
+                return chr(int(digits, 16))
+            except (ValueError, OverflowError):
+                return match.group(0)
+        if escape[0] == "u" and len(escape) == 5:
+            return chr(int(escape[1:], 16))
+        if escape[0] == "x" and len(escape) == 3:
+            return chr(int(escape[1:], 16))
+        if escape[0] in "01234567" and len(escape) <= 3:
+            return chr(int(escape, 8))
+        return {
+            "n": "\n",
+            "r": "\r",
+            "t": "\t",
+            "b": "\b",
+            "f": "\f",
+            "v": "\v",
+            "0": "\0",
+        }.get(escape, escape)
+
+    return _JS_ESCAPE_RE.sub(replace, text)
+
+
+def _to_base(value: int, base: int) -> str:
+    """packer と同じ基数表現に変換する（0-9a-zA-Z）。"""
+    if value == 0:
+        return "0"
+    digits: list[str] = []
+    while value:
+        value, remainder = divmod(value, base)
+        digits.append(_BASE_ALPHABET[remainder])
+    return "".join(reversed(digits))
+
+
+def _unpack(packed: str, base: int, count: int, keys: list[str]) -> str:
+    """packer の文字列を、キーワード表を使って展開する。"""
+    if base < 2 or base > len(_BASE_ALPHABET) or count <= 0:
+        return packed
+    table: dict[str, str] = {}
+    for index in range(count):
+        if index >= len(keys):
+            break
+        keyword = keys[index]
+        if keyword:
+            table[_to_base(index, base)] = keyword
+    if not table:
+        return packed
+    return re.sub(
+        r"\b\w+\b", lambda match: table.get(match.group(0), match.group(0)), packed
+    )
+
+
+def _decode_packer_calls(text: str) -> list[str]:
+    """Dean Edwards 形式の packer 呼び出しを展開した結果を返す。"""
+    decoded: list[str] = []
+    for match in _PACKER_CALL_RE.finditer(text):
+        if len(decoded) >= MAX_PACKER_CALLS:
+            break
+        try:
+            packed = _unescape_js(match.group("p")[1:-1])
+            keys = _unescape_js(match.group("k")[1:-1]).split("|")
+            base = int(match.group("a"))
+            count = int(match.group("c"))
+        except (ValueError, OverflowError):
+            continue
+        decoded.append(_unpack(packed, base, count, keys))
+    return decoded
+
+
+def decode_obfuscated_javascript(text: str) -> list[str]:
+    """難読化された JavaScript を展開し、解読結果の一覧を返す。
+
+    Dean Edwards の packer（``eval(function(p,a,c,k,e,d){...}(...))``）を
+    対象にする。多重に難読化されている場合は数段まで追う。
+    """
+    results: list[str] = []
+    current = _decode_packer_calls(text)
+    for _ in range(MAX_PACKER_DEPTH):
+        if not current:
+            break
+        results.extend(current)
+        current = _decode_packer_calls("\n".join(current))
+    return results
+
+
 def _append_url(
     found: list[str], seen: set[str], raw: str, base_url: str
 ) -> None:
@@ -123,17 +235,24 @@ def _append_url(
 
 
 def extract_m3u8_urls(text: str, base_url: str) -> list[str]:
-    """テキストから m3u8 URL を抽出し、出現順の重複なしリストを返す。"""
-    normalized = _decode_escapes(text)
+    """テキストから m3u8 URL を抽出し、出現順の重複なしリストを返す。
+
+    難読化された JavaScript（Dean Edwards の packer）が含まれる場合は
+    展開してから走査する。エスケープの解釈で文字列リテラルが壊れないよう、
+    展開は生のテキストに対して先に行う。
+    """
     found: list[str] = []
     seen: set[str] = set()
 
-    for match in _ABSOLUTE_RE.finditer(normalized):
-        _append_url(found, seen, match.group(0), base_url)
-    for match in _QUOTED_RE.finditer(normalized):
-        _append_url(found, seen, match.group(1), base_url)
-    for match in _ROOT_RE.finditer(normalized):
-        _append_url(found, seen, match.group(0), base_url)
+    sources = [text, *decode_obfuscated_javascript(text)]
+    for source in sources:
+        normalized = _decode_escapes(source)
+        for match in _ABSOLUTE_RE.finditer(normalized):
+            _append_url(found, seen, match.group(0), base_url)
+        for match in _QUOTED_RE.finditer(normalized):
+            _append_url(found, seen, match.group(1), base_url)
+        for match in _ROOT_RE.finditer(normalized):
+            _append_url(found, seen, match.group(0), base_url)
     return found
 
 

@@ -98,6 +98,8 @@ video-concat --from-page https://example.com/watch/123 --source-index 1
   - `static`: HTML・インライン JS・同一オリジンの外部スクリプト・iframe の
     静的解析のみ行います。`--page-wait` / `--browser-path` / `--headed` /
     `--user-data-dir` / `--click-selector` とは併用できません。
+    Dean Edwards の packer（`eval(function(p,a,c,k,e,d){...})` 形式）で
+    難読化された URL は展開して検出します。
   - `browser`: Chrome / Edge / Chromium を CDP で操作し、ページの通信から
     m3u8 を検出します。JavaScript で URL を生成するページ向けです。
 - 候補の選択:
@@ -285,7 +287,7 @@ uv run pytest
 | `tests/test_headers.py` | ヘッダ解析、正規化、インジェクション対策 |
 | `tests/test_ffmpeg_bootstrap.py` | ffmpeg 探索、tar.xz / zip 展開、SHA256、既存ファイル |
 | `tests/test_cli.py` | 引数なしヘルプ、バージョン、設定エラー、`--from-page` の引数検証 |
-| `tests/test_page_source.py` | m3u8 URL 抽出、静的探索、iframe / 外部スクリプト、候補選択 |
+| `tests/test_page_source.py` | m3u8 URL 抽出、静的探索、iframe / 外部スクリプト、候補選択、packer の展開 |
 | `tests/test_ws.py` | WebSocket のハンドシェイク、分割フレーム、ping/pong、マスク |
 | `tests/test_e2e.py` | 合成 TS、HTTP 配信、Referer、ffmpeg 結合、ページ探索 |
 

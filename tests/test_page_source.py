@@ -9,6 +9,7 @@ from video_concat.page_source import (
     CandidateHint,
     DiscoveryError,
     SourceCandidate,
+    decode_obfuscated_javascript,
     discover_static,
     extract_m3u8_urls,
     probe_candidates,
@@ -333,3 +334,154 @@ def test_probe_candidates_uses_referer() -> None:
 
     assert candidates[0].ok
     assert seen["referer"] == "https://example.com/watch"
+
+
+def _to_base(value: int, base: int) -> str:
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if value == 0:
+        return "0"
+    digits = []
+    while value:
+        value, remainder = divmod(value, base)
+        digits.append(alphabet[remainder])
+    return "".join(reversed(digits))
+
+
+def _pack(source: str, keys: list[str], base: int = 36) -> str:
+    """テスト用の簡易 packer。本物の packer と同じ形の文字列を組み立てる。"""
+    packed = source
+    for index in sorted(
+        range(len(keys)), key=lambda i: len(keys[i]), reverse=True
+    ):
+        if keys[index]:
+            packed = packed.replace(keys[index], _to_base(index, base))
+    escaped = packed.replace("\\", "\\\\").replace("'", "\\'")
+    escaped_keys = "|".join(
+        key.replace("\\", "\\\\").replace("'", "\\'") for key in keys
+    )
+    return (
+        "eval(function(p,a,c,k,e,d){e=function(c){return c.toString(36)};"
+        "if(!''.replace(/^/,String)){while(c--){d[c.toString(a)]=k[c]||c.toString(a)}"
+        "k=[function(e){return d[e]}];e=function(){return'\\\\w+'};c=1};"
+        "while(c--){if(k[c]){p=p.replace(new RegExp('\\\\b'+e(c)+'\\\\b','g'),k[c])}}"
+        "return p}('"
+        + escaped
+        + "',"
+        + str(base)
+        + ","
+        + str(len(keys))
+        + ",'"
+        + escaped_keys
+        + "'.split('|'),0,{}))"
+    )
+
+
+# missav.fans で実際に使われていた packer（a=15）を縮めたもの。
+REAL_PACKED = (
+    r"""eval(function(p,a,c,k,e,d){e=function(c){return c.toString(36)};"""
+    r"""if(!''.replace(/^/,String)){while(c--){d[c.toString(a)]=k[c]||c.toString(a)}"""
+    r"""k=[function(e){return d[e]}];e=function(){return'\\w+'};c=1};"""
+    r"""while(c--){if(k[c]){p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c])}}"""
+    r"""return p}('e=\'8://7.6/5-4-3-2-1/d.0\';c=\'8://7.6/5-4-3-2-1/a/9.0\';',"""
+    r"""15,15,'m3u8|34e6a003cf0f|9cf6|4eed|f448|83d34978|mrstcdn.store|surrit|"""
+    r"""https|video|720p|source1280|source842|playlist|source'.split('|'),0,{}))"""
+)
+
+
+def test_decode_packer_real_example() -> None:
+    decoded = decode_obfuscated_javascript(REAL_PACKED)
+
+    assert len(decoded) == 1
+    assert (
+        "https://surrit.mrstcdn.store/"
+        "83d34978-f448-4eed-9cf6-34e6a003cf0f/playlist.m3u8" in decoded[0]
+    )
+    assert (
+        "https://surrit.mrstcdn.store/"
+        "83d34978-f448-4eed-9cf6-34e6a003cf0f/720p/video.m3u8" in decoded[0]
+    )
+
+
+def test_extract_urls_from_obfuscated_javascript() -> None:
+    urls = extract_m3u8_urls(REAL_PACKED, "https://example.com/watch")
+
+    assert urls == [
+        "https://surrit.mrstcdn.store/"
+        "83d34978-f448-4eed-9cf6-34e6a003cf0f/playlist.m3u8",
+        "https://surrit.mrstcdn.store/"
+        "83d34978-f448-4eed-9cf6-34e6a003cf0f/720p/video.m3u8",
+    ]
+
+
+def test_pack_and_decode_round_trip() -> None:
+    source = "source='https://cdn.example.com/720p/video.m3u8';"
+    packed = _pack(
+        source, ["https://cdn.example.com/720p/video.m3u8", "source"]
+    )
+
+    decoded = decode_obfuscated_javascript(packed)
+
+    assert decoded == [source]
+
+
+def test_decode_packer_handles_multi_digit_base() -> None:
+    url = "https://cdn.example.com/x.m3u8"
+    keys = [""] * 11
+    keys[10] = url
+    packed = (
+        "eval(function(p,a,c,k,e,d){e=function(c){return c.toString(36)};"
+        "if(!''.replace(/^/,String)){while(c--){d[c.toString(a)]=k[c]||c.toString(a)}"
+        "k=[function(e){return d[e]}];e=function(){return'\\w+'};c=1};"
+        "while(c--){if(k[c]){p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c])}}"
+        "return p}('a=\\'10\\'',10,11,'"
+        + "|".join(keys)
+        + "'.split('|'),0,{}))"
+    )
+
+    assert decode_obfuscated_javascript(packed) == [f"a='{url}'"]
+
+
+def test_decode_multiple_packer_calls() -> None:
+    first = _pack("u='https://cdn.example.com/a.m3u8';", [
+        "https://cdn.example.com/a.m3u8",
+        "u",
+    ])
+    second = _pack("u='https://cdn.example.com/b.m3u8';", [
+        "https://cdn.example.com/b.m3u8",
+        "u",
+    ])
+
+    decoded = decode_obfuscated_javascript(first + "\n" + second)
+
+    assert any("a.m3u8" in text for text in decoded)
+    assert any("b.m3u8" in text for text in decoded)
+
+
+def test_plain_eval_is_not_decoded() -> None:
+    text = "eval(\"console.log('hello')\")"
+
+    assert decode_obfuscated_javascript(text) == []
+
+
+def test_packed_javascript_is_scanned_in_page() -> None:
+    fetch = FakeFetch(
+        {
+            "https://example.com/watch": (
+                "<script>" + REAL_PACKED + "</script>"
+            ),
+            "https://surrit.mrstcdn.store/"
+            "83d34978-f448-4eed-9cf6-34e6a003cf0f/playlist.m3u8": MASTER,
+            "https://surrit.mrstcdn.store/"
+            "83d34978-f448-4eed-9cf6-34e6a003cf0f/720p/video.m3u8": PLAYLIST,
+        }
+    )
+
+    result = _discover(fetch)
+
+    assert [candidate.url for candidate in result.candidates] == [
+        "https://surrit.mrstcdn.store/"
+        "83d34978-f448-4eed-9cf6-34e6a003cf0f/playlist.m3u8",
+        "https://surrit.mrstcdn.store/"
+        "83d34978-f448-4eed-9cf6-34e6a003cf0f/720p/video.m3u8",
+    ]
+    assert result.candidates[0].origin == "インラインJS"

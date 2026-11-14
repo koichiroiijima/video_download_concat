@@ -92,6 +92,8 @@ PY
 - 自動ダウンロードの URL・SHA256 は `ffmpeg_sources.py` に固定する。
   変更時はライセンス情報も更新する。
 - `--from-page` の探索は静的解析（`page_source.py`）→ ブラウザ（`browser_cdp.py`）の順。
+  静的解析は Dean Edwards の packer（`eval(function(p,a,c,k,e,d){...})`）を
+  `decode_obfuscated_javascript()` で展開してから URL を探す。
   ブラウザは利用者環境の Chrome / Edge / Chromium を CDP で操作する。
 - ブラウザ方式の WebSocket は `ws.py`（標準ライブラリのみ）。`wss://` は未対応。
 - ブラウザ方式の E2E は `tests/test_e2e.py` にあり、ヘッドレスブラウザが見つかる
