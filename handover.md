@@ -125,13 +125,18 @@ uv run pytest tests/test_e2e.py -q
   - `video.m3u8` から 1830 セグメントを解析できることを確認。
 - 2026-11-03: ドキュメントを実装に追従（オプション・探索順・zip 展開時の権限・
   ライセンスファイルの生成方法）。
-- 2026-11-03: テスト用モック HLS サーバーを追加。
+- 2026-11-11: テスト用モック HLS サーバーを追加。
   - `tools/mock-hls-server/server.mjs` — Node.js 標準モジュールのみ。
     Referer 完全一致検査、不一致・未指定は 403。
   - `tools/mock-hls-server/generate-media.mjs` — ffmpeg で MPEG-TS を生成。
   - 生成物 (`tools/mock-hls-server/media/`) は `.gitignore` 対象。
   - 動作確認: Referer なし / 不一致 → 403、正しい Referer → 200。
     `video-concat` で 6 セグメントを取得し、6.16 秒の MP4 を生成。
+- 2026-11-14: README の利用方法を最新化（実装の変更はなし）。
+  - 「実行の流れ」を追加（取得 → 並列ダウンロード → 結合 → 後始末）。
+  - ローカル m3u8 と `--base-url` の使い方、`-H` による複数ヘッダ指定を追記。
+  - 403 / `EXT-X-TOKEN` / ffmpeg 未検出などのトラブル対処表を追加。
+  - ボット対策・Cookie などの認証に関する制限事項を追記。
 
 ## 6. 既知の制約・注意点
 
@@ -151,6 +156,10 @@ uv run pytest tests/test_e2e.py -q
   元のプレイリストが壊れているため、トークンの対応は保証できない。
 - `EXT-X-TOKEN` の正しい使い方（クエリ / ヘッダ / Cookie）は配信元によって異なる。
   実データで確認するまでは `--token-query` / `--token-header` を指定して検証すること。
+- Cloudflare などのボット対策が有効な配信元では、Referer やヘッダを指定しても
+  取得できないことがある。本ツールはボット対策を回避する機能を持たない。
+- Cookie やセッショントークンが必要な配信元は、`-H` や `--token-query` /
+  `--token-header` で対応できる範囲に限られる。
 - モック HLS サーバーは Node.js 18 以上が必要で、開発時のみ使用する。
   生成した `tools/mock-hls-server/media/` はコミットしない。
 - ライブ配信は実行時点のスナップショットのみ。

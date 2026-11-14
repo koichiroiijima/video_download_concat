@@ -254,6 +254,6 @@ cli.main
   - Linux 配布 zip 展開時の実行権限（`chmod +x`）を README / build に追記。
   - `--keep-segments` が残すファイル、`EXT-X-MEDIA` の警告動作を明記。
   - `FFMPEG-BUILD-INFO.txt` がビルド時生成であることを明記。
-- 2026-11-03: テスト用モック HLS サーバーを追加。
+- 2026-11-11: テスト用モック HLS サーバーを追加。
   - `tools/mock-hls-server/server.mjs`（Referer 完全一致検査、403）。
   - `tools/mock-hls-server/generate-media.mjs`（ffmpeg で TS 生成）。
