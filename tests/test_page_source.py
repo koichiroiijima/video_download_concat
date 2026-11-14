@@ -16,6 +16,7 @@ from video_concat.page_source import (
     extract_m3u8_urls,
     probe_candidates,
     select_candidate,
+    video_candidate_index,
 )
 
 PLAYLIST = "\n".join(
@@ -405,6 +406,50 @@ def test_select_candidate_enter_uses_video_m3u8(monkeypatch) -> None:
     monkeypatch.setattr("builtins.input", lambda: "")
 
     assert select_candidate([master, media], interactive=True) is media
+
+
+def test_video_candidate_index_returns_none_for_failed() -> None:
+    failed = SourceCandidate(
+        url="https://cdn.example.com/video.m3u8",
+        origin="HTML",
+        error="404",
+    )
+
+    assert video_candidate_index([failed]) is None
+
+
+def test_select_candidate_prefer_video_selects_video_m3u8() -> None:
+    master = SourceCandidate(
+        url="https://cdn.example.com/uuid/playlist.m3u8",
+        origin="HTML",
+        playlist=Playlist(source="https://cdn.example.com/uuid/playlist.m3u8"),
+    )
+    media = SourceCandidate(
+        url="https://cdn.example.com/uuid/720p/video.m3u8",
+        origin="HTML",
+        playlist=Playlist(source="https://cdn.example.com/uuid/720p/video.m3u8"),
+    )
+
+    assert (
+        select_candidate([master, media], interactive=False, prefer_video=True)
+        is media
+    )
+
+
+def test_select_candidate_prefer_video_errors_without_video() -> None:
+    first = SourceCandidate(
+        url="https://cdn.example.com/a.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+    second = SourceCandidate(
+        url="https://cdn.example.com/b.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+
+    with pytest.raises(DiscoveryError, match="video.m3u8"):
+        select_candidate([first, second], interactive=False, prefer_video=True)
 
 
 def test_probe_candidates_uses_referer() -> None:

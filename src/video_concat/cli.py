@@ -217,6 +217,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="使用する候補の番号（0 始まり）",
     )
     parser.add_argument(
+        "--prefer-video",
+        action="store_true",
+        help=(
+            "ファイル名が video.m3u8 の候補を自動で選ぶ"
+            "（無ければエラー。--source-index とは併用不可）"
+        ),
+    )
+    parser.add_argument(
         "--browser-path",
         metavar="PATH",
         help="Chrome / Edge / Chromium の実行パス（既定: 自動探索）",
@@ -362,6 +370,15 @@ def _validate_args(args: argparse.Namespace) -> None:
             raise ValueError("--source-index は --from-page と一緒に指定してください")
         if args.source_index < 0:
             raise ValueError("--source-index は 0 以上を指定してください")
+    if args.prefer_video:
+        if args.from_page is None:
+            raise ValueError(
+                "--prefer-video は --from-page と一緒に指定してください"
+            )
+        if args.source_index is not None:
+            raise ValueError(
+                "--source-index と --prefer-video は同時に指定できません"
+            )
     if args.source is None and args.from_page is None:
         raise ValueError(
             "m3u8 の URL（SOURCE）か --from-page のどちらかを指定してください"
@@ -592,6 +609,7 @@ def run(args: argparse.Namespace, app_config: AppConfig) -> None:
         selected = select_candidate(
             discovery.candidates,
             index=args.source_index,
+            prefer_video=args.prefer_video,
         )
         source = selected.url
         explicit_user_agent = (

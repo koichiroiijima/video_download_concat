@@ -74,6 +74,20 @@ def test_invalid_config_returns_error(
             "--source-index",
         ),
         (
+            ["--prefer-video", "https://example.com/video.m3u8"],
+            "--prefer-video",
+        ),
+        (
+            [
+                "--from-page",
+                "https://example.com/",
+                "--source-index",
+                "0",
+                "--prefer-video",
+            ],
+            "同時に指定できません",
+        ),
+        (
             ["--from-page", "https://example.com/", "--page-mode", "unknown"],
             "--page-mode",
         ),

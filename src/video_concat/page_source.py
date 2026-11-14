@@ -578,9 +578,24 @@ def format_candidate(
     )
 
 
+VIDEO_PLAYLIST = "video.m3u8"
+
+
 def _candidate_filename(url: str) -> str:
     """URL のパス末尾（ファイル名）を取り出す。クエリや断片は無視する。"""
     return urlsplit(url).path.rsplit("/", 1)[-1].lower()
+
+
+def video_candidate_index(
+    candidates: list[SourceCandidate],
+) -> int | None:
+    """ファイル名が ``video.m3u8`` の有効な候補の番号を返す。"""
+    for candidate_index, candidate in enumerate(candidates):
+        if not candidate.ok:
+            continue
+        if _candidate_filename(candidate.url) == VIDEO_PLAYLIST:
+            return candidate_index
+    return None
 
 
 def default_candidate_index(
@@ -592,15 +607,13 @@ def default_candidate_index(
     メディアプレイリストで、マスターより目的の動画に近いため）。
     無ければ最初の有効な候補にする。
     """
-    valid = [
-        candidate_index
-        for candidate_index, candidate in enumerate(candidates)
-        if candidate.ok
-    ]
-    for candidate_index in valid:
-        if _candidate_filename(candidates[candidate_index].url) == "video.m3u8":
+    video_index = video_candidate_index(candidates)
+    if video_index is not None:
+        return video_index
+    for candidate_index, candidate in enumerate(candidates):
+        if candidate.ok:
             return candidate_index
-    return valid[0] if valid else None
+    return None
 
 
 def select_candidate(
@@ -608,6 +621,7 @@ def select_candidate(
     *,
     index: int | None = None,
     interactive: bool | None = None,
+    prefer_video: bool = False,
 ) -> SourceCandidate:
     """一覧から使用する候補を選ぶ。"""
     if not candidates:
@@ -629,6 +643,16 @@ def select_candidate(
                 f"候補 {index} は取得できませんでした: {selected.error}"
             )
         return selected
+
+    if prefer_video:
+        video_index = video_candidate_index(candidates)
+        if video_index is None:
+            raise DiscoveryError(
+                f"ファイル名が {VIDEO_PLAYLIST} の候補が見つかりませんでした。"
+                "--list-candidates で候補を確認し、"
+                "--source-index で番号を指定してください。"
+            )
+        return candidates[video_index]
 
     valid = [candidate for candidate in candidates if candidate.ok]
     if len(valid) == 1:

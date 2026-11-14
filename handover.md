@@ -225,6 +225,12 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
   - 実ページ（`missav.fans`）で `playlist.m3u8`（マスター）と
     `720p/video.m3u8`（メディア）が並ぶとき、後者が既定になることを確認。
   - テストを追加して 89 passed。
+- 2026-11-15: `--prefer-video` を追加。
+  - `--from-page` で `video.m3u8` の候補があれば自動選択し、無ければエラー。
+  - 指定しない場合の挙動は従来どおり（1 件なら自動、複数は `--source-index`
+    または対話。既定は `video.m3u8`）。
+  - `page_source.video_candidate_index()` を追加。`--source-index` とは併用不可。
+  - テストを追加して 94 passed。
 
 ## 6. 既知の制約・注意点
 

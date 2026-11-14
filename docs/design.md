@@ -263,6 +263,8 @@ cli.main
 - `select_candidate()`:
   - `--source-index` の値（`index`）があればそれを採用し、範囲外・取得失敗は
     `DiscoveryError`。
+  - `prefer_video=True`（`--prefer-video`）なら、`video_candidate_index()` が
+    返す候補を対話なしで採用する。該当が無ければ `DiscoveryError`。
   - 有効な候補が 1 件なら自動選択する。
   - 複数かつ非対話（stdin が TTY でない）なら `DiscoveryError` にして
     `--source-index` を案内する。
@@ -270,10 +272,10 @@ cli.main
     空 Enter は `default_candidate_index()` が返す候補
     （ファイル名が `video.m3u8` の有効な候補、無ければ最初の有効な候補）。
     選択できなければ `DiscoveryError`。
-- `default_candidate_index()`: 番号選択の既定値を決める。URL のパス末尾
-  （クエリ・断片を除く）が `video.m3u8` の有効な候補を優先する。
-  配信元ではマスターの `playlist.m3u8` とメディアの `video.m3u8` が
-  並ぶことが多く、メディア側が目的の動画に近いため。
+- `video_candidate_index()`: ファイル名が `video.m3u8` の有効な候補の番号を
+  返す。`--prefer-video` と番号選択の既定値で使う。
+- `default_candidate_index()`: 番号選択の既定値を決める。`video_candidate_index()`
+  があればそれを、無ければ最初の有効な候補を返す。
 - `format_candidate()`: 一覧表示用に、マスター（Variant 数）/ メディア
   （セグメント数・合計時間）/ 取得失敗を整形する。`--list-candidates` で使う。
   `default=True` の候補には `(既定)` を付ける。
@@ -366,6 +368,7 @@ cli.main
 2. `--from-page` の場合は Webページから m3u8 の候補を探索する。
    `auto` は静的解析で有効な候補が見つかればそれを採用し、無ければブラウザ方式に
    フォールバックする。候補が 1 件なら自動選択、複数なら `--source-index` か
+   `--prefer-video`（`video.m3u8` を自動選択）を指定する。どちらも無ければ
    対話で選ぶ（空 Enter の既定は `video.m3u8` の候補）。
    選んだ URL を取得元にし、候補ヘッダを明示指定の無い項目だけ補う。
    Referer が無ければ最終ページ URL で補う。
@@ -473,3 +476,10 @@ cli.main
   - `format_candidate()` に `default` 引数を追加し、一覧と
     `--list-candidates` で既定の候補に `(既定)` を付ける。
   - `tests/test_page_source.py` に既定値の決定・空 Enter のテストを追加。
+- 2026-11-15: `--prefer-video` を追加。
+  - 指定時はファイル名が `video.m3u8` の有効な候補を対話なしで採用し、
+    無ければ `DiscoveryError` にして終了コード 1 にする。
+  - `--source-index` とは同時に指定できない（`cli._validate_args` で検査）。
+  - `page_source.video_candidate_index()` を追加し、
+    `default_candidate_index()` と共通化した。
+  - `tests/test_page_source.py` と `tests/test_cli.py` にテストを追加。

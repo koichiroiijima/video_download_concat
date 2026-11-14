@@ -54,6 +54,7 @@ uv run python -m video_concat --from-page URL [OPTIONS]
 | `--page-wait SECONDS` | `5` | ブラウザでページを開いてから待つ秒数（0 以上） |
 | `--list-candidates` | 無効 | 見つかった候補を一覧表示して終了（`--from-page` 必須） |
 | `--source-index N` | なし | 使用する候補の番号（0 始まり、`--from-page` 必須） |
+| `--prefer-video` | 無効 | ファイル名が `video.m3u8` の候補を自動選択（無ければエラー、`--from-page` 必須、`--source-index` と併用不可） |
 | `--browser-path PATH` | 自動探索 | Chrome / Edge / Chromium の実行パス |
 | `--headed` | 無効 | ブラウザを画面表示ありで起動（デバッグ用） |
 | `--user-data-dir PATH` | 一時ディレクトリ | ブラウザのユーザーデータディレクトリ |
@@ -109,6 +110,8 @@ video-concat --from-page https://example.com/watch/123 --source-index 1
     ファイル名が `video.m3u8` の有効な候補、無ければ最初の有効な候補を使います。
     非対話で複数ある場合はエラーにします。
   - 対話時の一覧と `--list-candidates` では、既定になる候補に `(既定)` を付けます。
+  - `--prefer-video` を指定すると、対話をせずにファイル名が `video.m3u8` の
+    有効な候補を自動選択します。該当が無ければエラーです。
 - `--list-candidates`: 候補を一覧表示して終了します。取得失敗した候補も
   理由付きで表示します。候補が 0 件の場合はエラー（終了コード 1）です。
 - ヘッダ:
@@ -250,6 +253,9 @@ Referer は m3u8 本体、マスターの子プレイリスト、すべてのセ
 | `--from-page` が http/https 以外 | `--from-page には http:// / https:// の URL を指定してください` |
 | `--from-page` と `--base-url` の併用 | `--from-page と --base-url は同時に指定できません` |
 | `--list-candidates` / `--source-index` を `--from-page` なしで指定 | `<option> は --from-page と一緒に指定してください` |
+| `--prefer-video` を `--from-page` なしで指定 | `--prefer-video は --from-page と一緒に指定してください` |
+| `--source-index` と `--prefer-video` の併用 | `--source-index と --prefer-video は同時に指定できません` |
+| `--prefer-video` で `video.m3u8` の候補が無い | `ファイル名が video.m3u8 の候補が見つかりませんでした。...` |
 | `--page-mode` の不正値 | `--page-mode には auto / static / browser のいずれかを指定してください` |
 | `--page-mode static` とブラウザ系オプションの併用 | `<option> は --page-mode static と同時に指定できません` |
 | `--page-wait` が負の値 | `--page-wait は 0 以上を指定してください` |

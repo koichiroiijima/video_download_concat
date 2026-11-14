@@ -107,6 +107,9 @@ video-concat.exe --from-page "https://example.com/watch/123" -o output.mp4
 
 # 候補が複数あるときは番号で指定（0 始まり）
 video-concat.exe --from-page "https://example.com/watch/123" --source-index 1
+
+# ファイル名が video.m3u8 の候補を自動で選ぶ（無ければエラー）
+video-concat.exe --from-page "https://example.com/watch/123" --prefer-video
 ```
 
 - 既定（`--page-mode auto`）は、まずページの HTML・JavaScript・iframe を
@@ -120,6 +123,9 @@ video-concat.exe --from-page "https://example.com/watch/123" --source-index 1
   対話端末で実行している場合は番号を入力できます。何も入力せずに Enter を押すと、
   ファイル名が `video.m3u8` の候補（無ければ最初の有効な候補）を使います。
   一覧では既定の候補に `(既定)` が付きます。
+- `--prefer-video` を指定すると、対話をせずにファイル名 `video.m3u8` の候補を
+  自動で選びます。該当する候補が無い場合はエラーになります（`--source-index` とは
+  併用できません）。
 - Referer を明示していない場合は、ページの URL を自動で設定します
   （`-H "Referer: ..."` や `[http] referer` を指定した場合はそちらが優先されます）。
   ログインが必要なページでは `--user-data-dir` にログイン済みのブラウザプロファイルを
@@ -244,6 +250,7 @@ auto_download = false
 | `--page-wait SECONDS` | ブラウザでページを開いて待つ秒数（既定: 5） |
 | `--list-candidates` | 見つかった候補を一覧表示して終了 |
 | `--source-index N` | 使用する候補の番号（0 始まり） |
+| `--prefer-video` | ファイル名が `video.m3u8` の候補を自動選択（無ければエラー） |
 | `--browser-path PATH` | Chrome / Edge / Chromium の実行パス |
 | `--headed` | ブラウザを画面表示ありで起動（確認用） |
 | `--user-data-dir PATH` | ブラウザのユーザーデータディレクトリ |
