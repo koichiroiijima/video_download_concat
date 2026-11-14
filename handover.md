@@ -28,11 +28,11 @@ Python 不要の配布版（PyInstaller onedir）を追加した。
 | ffmpeg の同梱探索・初回自動ダウンロード | 実装済み |
 | モック HLS サーバー（HTTP / Referer 検査） | 実装済み・確認済み |
 | Webページからの m3u8 探索（`--from-page`） | 実装済み（静的解析 + ブラウザ） |
-| ブラウザ方式（`browser_cdp.py` / `ws.py`） | 実装済み・手動確認のみ |
+| ブラウザ方式（`browser_cdp.py` / `ws.py`） | 実装済み（E2E はブラウザがある環境のみ） |
 | PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
 | Linux 配布版のビルド・E2E | 確認済み（zip 展開後も確認） |
 | Windows 11 配布版のビルド・E2E | **未確認（Windows 実機が必要）** |
-| 自動テスト | 36 passed |
+| 自動テスト | 67 passed（ブラウザ E2E は環境によりスキップ） |
 | AES-128 / fMP4 / BYTERANGE | 未対応（明示エラー） |
 
 ## 3. 現在の実行状態
@@ -176,7 +176,10 @@ uv run pytest tests/test_e2e.py -q
     `--source-index` / `--browser-path` / `--headed` / `--user-data-dir` /
     `--click-selector` を追加。`SOURCE` は任意引数になり、`--from-page` と排他。
     `auto` は静的解析 → ブラウザの順。
-  - ページ探索の自動テストは未追加（`uv run pytest` は 36 passed のまま）。
+  - テストを追加: `tests/test_page_source.py`（静的解析・候補選択）、
+    `tests/test_ws.py`（WebSocket のハンドシェイク・分割フレーム・マスク）、
+    `tests/test_e2e.py`（静的解析 E2E、ブラウザ方式の Cookie / Referer E2E）。
+    `uv run pytest` は 67 passed（ブラウザ E2E は環境によりスキップ）。
 
 ## 6. 既知の制約・注意点
 
@@ -213,8 +216,8 @@ uv run pytest tests/test_e2e.py -q
 - 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。
 - `list.cmd` は 4 桁ゼロ埋めのため 10,000 セグメント以上では破綻するが、
   本ツールはプレイリスト順を使うため影響しない。
-- `page_source.py` / `browser_cdp.py` / `ws.py`（ページ探索）は自動テスト未追加。
-  確認は手動で行う。ブラウザ方式を CI で回すにはヘッドレスブラウザの導入が必要。
+- `page_source.py` / `ws.py` は単体テストあり。`browser_cdp.py` は E2E のみで、
+  ヘッドレスブラウザが見つからない環境ではスキップされる。
 - ブラウザ方式は利用者環境の Chrome / Edge / Chromium が必要。配布物には同梱しない。
   見つからない場合は `--browser-path` か環境変数 `VIDEO_CONCAT_BROWSER` で指定する。
 - `ws.py` は `ws://` のみ対応（`wss://` は未対応）。CDP 用途の最小実装。
