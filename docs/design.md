@@ -98,6 +98,8 @@ cli.main
     ├── test_config.py
     ├── test_headers.py
     ├── test_ffmpeg_bootstrap.py
+    ├── test_page_source.py
+    ├── test_ws.py
     └── test_e2e.py
 ```
 
@@ -366,8 +368,9 @@ cli.main
   最小実装で扱う。
 - **ブラウザが送ったヘッダを再利用する**。Referer / Origin / Cookie / User-Agent を
   候補に付け、明示指定が無い項目だけ補う。Referer は最終ページ URL で補う。
-- **ブラウザ方式の自動テストは未追加**。ヘッドレスブラウザ依存になるため、
-  確認は手動またはモックページで行う。
+- **ブラウザ方式の E2E テストは、ヘッドレスブラウザが見つかる環境でのみ実行する**。
+  `VIDEO_CONCAT_TEST_BROWSER`、Playwright の Chromium キャッシュ、
+  `PATH` 上の Chrome / Edge / Chromium の順に探し、無ければスキップする。
 
 ## 6. 変更履歴 (主要トピック)
 
