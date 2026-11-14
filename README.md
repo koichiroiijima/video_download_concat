@@ -56,23 +56,76 @@ video-concat.exe "https://example.com/video.m3u8" --keep-segments
 
 # 既存の出力を上書きする
 video-concat.exe "https://example.com/video.m3u8" --force
+
+# 取得したプレイリストを保存する
+video-concat.exe "https://example.com/video.m3u8" --save-playlist playlist.m3u8
 ```
 
-### Referer の設定
+### 実行の流れ
 
-配布フォルダの `video-concat.ini` を編集します。
+1. m3u8 を取得して解析します。マスタープレイリストの場合は `--variant` で 1 つ選びます
+   （既定は `best`）。
+2. セグメントを並列ダウンロードします（`--concurrency`、既定 8）。
+3. `list.txt` を作成し、ffmpeg の concat デマルチプレクサで 1 本の MP4 に結合します。
+4. 成功すると、セグメント・`list.txt`・`playlist.m3u8` を削除します。
+   `--keep-segments` を指定すると残します。
+
+出力 MP4 は一時ファイルに書き出してから置き換えるため、結合に失敗しても
+中途半端な MP4 は残りません。
+
+### ローカルの m3u8 を使う
+
+ローカルの `.m3u8` ファイルを指定できます。相対 URI の取得先を配信元にしたい場合は
+`--base-url` を指定します。
+
+```bash
+# Linux（Windows は ./video-concat を video-concat.exe に置き換えます）
+./video-concat playlist.m3u8 \
+  --base-url https://example.com/path/ \
+  -o output.mp4
+```
+
+- `--base-url` を省略すると、m3u8 のあるフォルダを基準にします。
+- `file://` の URL も指定できます。
+- m3u8 に `EXT-X-TOKEN` が含まれる場合は、`--token-query` / `--token-header` も
+  あわせて指定します。
+
+### Referer と追加ヘッダ
+
+配信元が Referer を要求する場合は、設定ファイルか `-H` で指定します。
+
+配布フォルダの `video-concat.ini` を編集する場合:
 
 ```ini
 [http]
 referer = https://example.com/watch/123
+user_agent = Mozilla/5.0 ...
 ```
 
 Referer は **m3u8 本体、マスターの子プレイリスト、すべてのセグメント**に送られます。
-コマンドラインで上書きする場合は `-H` を使います。
+
+コマンドラインで指定する場合は `-H` を使います。複数のヘッダを同時に指定できます。
 
 ```powershell
-video-concat.exe "https://example.com/video.m3u8" -H "Referer: https://example.com/"
+video-concat.exe "https://example.com/video.m3u8" `
+  -H "Referer: https://example.com/watch/123" `
+  -H "Accept: */*"
 ```
+
+Linux の場合は行末のバッククォートではなく `\` で続けます。
+
+```bash
+./video-concat "https://example.com/video.m3u8" \
+  -H "Referer: https://example.com/watch/123" \
+  -H "Accept: */*"
+```
+
+- `-H` は設定ファイルの `referer` / `user_agent` より優先されます。
+- `-H` は `NAME: VALUE` 形式です。`Cookie` なども指定できますが、秘密情報の扱いに
+  注意してください。
+- 配信元によっては `Referer` だけでなく `User-Agent` や `Accept` なども必要な場合が
+  あります。
+- `--user-agent` より `-H "User-Agent: ..."` が優先されます。
 
 ### 設定ファイル
 
@@ -167,6 +220,18 @@ auto_download = false
 | `-v, --verbose` | デバッグログを表示 |
 | `-q, --quiet` | 進捗と警告を抑制 |
 | `--version` | バージョンを表示 |
+
+### うまくいかないとき
+
+| 症状 | 確認すること |
+| --- | --- |
+| `HTTP 403 Forbidden` | Referer が配信元のページと一致しているか確認してください。`-H "Referer: ..."` または `[http] referer` で指定します。`User-Agent` や `Accept` が必要な場合もあります。Cloudflare などのボット対策が有効な配信元では、Referer を付けても取得できないことがあります。 |
+| `EXT-X-TOKEN` の警告が出る | `--token-query NAME` または `--token-header NAME` で付与方法を指定してください。付与方法は配信元ごとに異なります。 |
+| セグメントの一部が失敗する | `--retries` を増やす、`--concurrency` を下げる、時間をおいて再実行してください。取得済みのセグメントは再利用されます。 |
+| `ffmpeg が見つかりません` | `--ffmpeg PATH` を指定するか、exe と同じフォルダに ffmpeg を置いてください。ソース実行では自動ダウンロードされません。 |
+| `出力ファイルが既に存在します` | `--force` を付けるか、`-o` で別の名前を指定してください。 |
+| 詳細なログを確認したい | `-v` を指定してください。 |
+| 進捗や警告を表示したくない | `-q` を指定してください。 |
 
 ## 2. 開発者向けの実行
 
@@ -290,6 +355,10 @@ Windows 版は Linux からクロスビルドできません。必ず Windows 11
 - ライブプレイリスト（`EXT-X-ENDLIST` なし）は、実行時点の内容だけをダウンロードします。
 - 自動ダウンロードにはインターネット接続が必要です。遮断される環境では
   `ffmpeg.exe` / `ffmpeg` を手動で配置してください。
+- 配信元によっては Cloudflare などのボット対策により、Referer やヘッダを指定しても
+  取得できない場合があります。本ツールはボット対策を回避する機能を持ちません。
+- Cookie やセッショントークンが必要な配信元は、`-H` や `--token-query` /
+  `--token-header` で対応できる範囲に限られます。
 
 ## 6. 注意
 
