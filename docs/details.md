@@ -31,6 +31,10 @@ uv run python -m video_concat SOURCE [OPTIONS]
 | `EXT-X-TOKEN` | 非標準。`--token-query` または `--token-header` で利用 |
 | Referer | 設定ファイルの `[http] referer`、または `-H "Referer: ..."` |
 
+Webページの URL を渡して m3u8 を自動検出する機能（`page_source.py`）は
+内部実装のみで、CLI からは利用できません。`--page-mode` / `--source-index` は
+未実装です。
+
 ### 出力
 
 | 項目 | 内容 |
@@ -218,6 +222,9 @@ E2E は ffmpeg が必要です。`vendor/ffmpeg/linux-x86_64/ffmpeg` がある�
 `VIDEO_CONCAT_TEST_FFMPEG` でパスを指定するか、`PATH` に ffmpeg を入れてください。
 ない場合はスキップされます。
 
+`page_source.py`（Webページからの m3u8 探索）と `ws.py`（WebSocket クライアント）は
+CLI 未接続の段階で、テストはまだありません。
+
 ### 実施済みの確認
 
 - `uv run pytest` → 36 passed
@@ -296,3 +303,10 @@ uv run python -m compileall -q src packaging tests
   `packaging/LICENSES/FFmpeg-NOTICE.txt` を更新する。
   `packaging/LICENSES/FFMPEG-BUILD-INFO.txt` はビルド時に自動生成される。
 - Windows では `list.txt` のパスにバックスラッシュを使わない（`/` に正規化する）。
+- Webページからの m3u8 自動検出（`page_source.py`）は CLI 未接続。`--page-mode` /
+  `--source-index` は未実装のため、CLI に接続する際は `select_candidate()` の
+  エラーメッセージとオプション名を一致させる。
+- `page_source.py` の docstring が参照する `browser_cdp`（ブラウザ方式）は未実装。
+  JavaScript の実行が必要なページには未対応。
+- `ws.py` は `ws://` のみ対応（`wss://` は未対応）。CDP 用途を想定した最小実装で、
+  汎用の WebSocket ライブラリではない。

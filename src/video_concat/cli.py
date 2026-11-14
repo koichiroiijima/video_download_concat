@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 from . import __version__
+from .browser_cdp import BrowserError, discover_browser
 from .config import AppConfig, find_config, load_config
 from .downloader import DownloadConfig, download_segments
 from .ffmpeg import FFmpegError, concat_segments
@@ -19,6 +20,13 @@ from .ffmpeg_bootstrap import resolve_ffmpeg
 from .headers import canonical_header, parse_header_items
 from .m3u8 import Playlist, PlaylistError, parse_playlist, select_variant
 from .net import DEFAULT_USER_AGENT, DownloadError, fetch_text_with_url
+from .page_source import (
+    DiscoveryError,
+    DiscoveryResult,
+    discover_static,
+    format_candidate,
+    select_candidate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,12 +175,65 @@ def _build_parser() -> argparse.ArgumentParser:
             '  video-concat https://example.com/video.m3u8 -o output.mp4 -c 16\n'
             '  video-concat video.m3u8 -H "Referer: https://example.com/"\n'
             "  video-concat URL --token-query token\n"
+            "  video-concat --from-page https://example.com/watch/123 -o output.mp4\n"
+            "  video-concat --from-page https://example.com/watch/123 --list-candidates\n"
             "  video-concat URL --config C:\\path\\video-concat.ini\n"
         ),
     )
     parser.add_argument(
         "source",
+        nargs="?",
         help="m3u8 の URL、またはローカルの .m3u8 ファイル",
+    )
+    parser.add_argument(
+        "--from-page",
+        metavar="URL",
+        help=(
+            "Webページの URL から m3u8 を探す。"
+            "静的解析で見つからない場合はブラウザで JS を実行する"
+        ),
+    )
+    parser.add_argument(
+        "--page-mode",
+        metavar="MODE",
+        help="m3u8 の探索方法: auto / static / browser（既定: auto）",
+    )
+    parser.add_argument(
+        "--page-wait",
+        type=float,
+        metavar="SECONDS",
+        help="ブラウザでページを開いてから待つ秒数（既定: 5）",
+    )
+    parser.add_argument(
+        "--list-candidates",
+        action="store_true",
+        help="見つかった m3u8 の候補を一覧表示して終了する",
+    )
+    parser.add_argument(
+        "--source-index",
+        type=int,
+        metavar="N",
+        help="使用する候補の番号（0 始まり）",
+    )
+    parser.add_argument(
+        "--browser-path",
+        metavar="PATH",
+        help="Chrome / Edge / Chromium の実行パス（既定: 自動探索）",
+    )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="ブラウザを画面表示ありで起動する（デバッグ用）",
+    )
+    parser.add_argument(
+        "--user-data-dir",
+        metavar="PATH",
+        help="ブラウザのユーザーデータディレクトリ（ログイン済みプロファイルを使う場合）",
+    )
+    parser.add_argument(
+        "--click-selector",
+        metavar="CSS",
+        help="再生ボタンなどをクリックする CSS セレクタ",
     )
     parser.add_argument(
         "--config",
@@ -291,6 +352,56 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _validate_args(args: argparse.Namespace) -> None:
+    if args.source is not None and args.from_page is not None:
+        raise ValueError("SOURCE と --from-page は同時に指定できません")
+    if args.source is None and args.from_page is None:
+        raise ValueError(
+            "m3u8 の URL（SOURCE）か --from-page のどちらかを指定してください"
+        )
+    if args.from_page is not None:
+        if not _is_http_url(args.from_page):
+            raise ValueError(
+                "--from-page には http:// / https:// の URL を指定してください"
+            )
+        if args.base_url is not None:
+            raise ValueError(
+                "--from-page と --base-url は同時に指定できません"
+            )
+    if args.list_candidates and args.from_page is None:
+        raise ValueError("--list-candidates は --from-page と一緒に指定してください")
+    if args.source_index is not None:
+        if args.from_page is None:
+            raise ValueError("--source-index は --from-page と一緒に指定してください")
+        if args.source_index < 0:
+            raise ValueError("--source-index は 0 以上を指定してください")
+    if args.page_mode is not None and args.page_mode not in {
+        "auto",
+        "static",
+        "browser",
+    }:
+        raise ValueError(
+            "--page-mode には auto / static / browser のいずれかを指定してください"
+        )
+    if args.page_wait is not None and args.page_wait < 0:
+        raise ValueError("--page-wait は 0 以上を指定してください")
+    if args.page_mode == "static":
+        for option, value in (
+            ("--page-wait", args.page_wait),
+            ("--browser-path", args.browser_path),
+            ("--headed", args.headed),
+            ("--user-data-dir", args.user_data_dir),
+            ("--click-selector", args.click_selector),
+        ):
+            if value:
+                raise ValueError(
+                    f"{option} は --page-mode static と同時に指定できません"
+                )
+    if args.click_selector is not None and not args.click_selector:
+        raise ValueError("--click-selector には空でない値を指定してください")
+    if args.browser_path is not None and not args.browser_path:
+        raise ValueError("--browser-path には空でないパスを指定してください")
+    if args.user_data_dir is not None and not args.user_data_dir:
+        raise ValueError("--user-data-dir には空でないパスを指定してください")
     if args.concurrency is not None and args.concurrency < 1:
         raise ValueError("--concurrency は 1 以上を指定してください")
     if args.retries is not None and args.retries < 1:
@@ -332,6 +443,93 @@ def _to_path(value: str | Path | None) -> Path | None:
     return Path(value).expanduser()
 
 
+def _merge_candidate_headers(
+    headers: dict[str, str],
+    candidate_headers: dict[str, str],
+    *,
+    allow_user_agent: bool,
+) -> None:
+    """ブラウザが実際に送ったヘッダを、明示指定がない項目だけ補う。"""
+    for name, value in candidate_headers.items():
+        canonical = canonical_header(name)
+        if canonical == "User-Agent" and not allow_user_agent:
+            continue
+        headers.setdefault(canonical, value)
+
+
+def _discover_page(
+    args: argparse.Namespace,
+    headers: dict[str, str],
+    *,
+    timeout: float,
+    retries: int,
+) -> DiscoveryResult:
+    mode = args.page_mode or "auto"
+    page_wait = args.page_wait if args.page_wait is not None else 5.0
+
+    if mode == "static":
+        return discover_static(
+            args.from_page,
+            headers=headers,
+            timeout=timeout,
+            retries=retries,
+        )
+
+    browser_kwargs = {
+        "headers": headers,
+        "timeout": timeout,
+        "page_wait": page_wait,
+        "browser_path": args.browser_path,
+        "headed": args.headed,
+        "user_data_dir": args.user_data_dir,
+        "click_selector": args.click_selector,
+        "user_agent": args.user_agent,
+    }
+
+    if mode == "browser":
+        try:
+            return discover_browser(args.from_page, **browser_kwargs)
+        except BrowserError as exc:
+            raise DiscoveryError(
+                f"ブラウザ方式で m3u8 を探索できませんでした: {exc}"
+            ) from exc
+
+    static_result: DiscoveryResult | None = None
+    static_error: Exception | None = None
+    try:
+        static_result = discover_static(
+            args.from_page,
+            headers=headers,
+            timeout=timeout,
+            retries=retries,
+        )
+        if any(candidate.ok for candidate in static_result.candidates):
+            return static_result
+    except (DownloadError, OSError) as exc:
+        static_error = exc
+
+    try:
+        browser_result = discover_browser(args.from_page, **browser_kwargs)
+    except BrowserError as exc:
+        if static_result is not None:
+            return static_result
+        detail = f"（静的解析: {static_error}）" if static_error else ""
+        raise DiscoveryError(
+            "Webページから m3u8 を検出できませんでした。"
+            f"ブラウザ方式も利用できません: {exc}{detail}"
+        ) from exc
+
+    if browser_result.candidates:
+        return browser_result
+    return static_result or browser_result
+
+
+def _print_candidates(discovery: DiscoveryResult) -> None:
+    print(f"m3u8 の候補: {len(discovery.candidates)} 件")
+    for index, candidate in enumerate(discovery.candidates):
+        print(format_candidate(index, candidate))
+
+
 def run(args: argparse.Namespace, app_config: AppConfig) -> None:
     user_agent = _pick(
         args.user_agent, app_config.user_agent, DEFAULT_USER_AGENT
@@ -355,6 +553,46 @@ def run(args: argparse.Namespace, app_config: AppConfig) -> None:
     if "User-Agent" not in headers:
         headers["User-Agent"] = user_agent
 
+    source = args.source
+    discovery: DiscoveryResult | None = None
+    if args.from_page is not None:
+        try:
+            discovery = _discover_page(
+                args, headers, timeout=timeout, retries=retries
+            )
+        except DownloadError as exc:
+            raise DiscoveryError(
+                f"Webページを取得できませんでした: {exc}"
+            ) from exc
+
+        if args.list_candidates:
+            _print_candidates(discovery)
+            if not discovery.candidates:
+                raise DiscoveryError(
+                    "Webページから m3u8 の候補を検出できませんでした。"
+                )
+            return
+
+        selected = select_candidate(
+            discovery.candidates,
+            index=args.source_index,
+        )
+        source = selected.url
+        explicit_user_agent = (
+            args.user_agent is not None or app_config.user_agent is not None
+        )
+        _merge_candidate_headers(
+            headers,
+            selected.headers,
+            allow_user_agent=not explicit_user_agent,
+        )
+        headers.setdefault("Referer", discovery.page_url)
+        if not args.quiet:
+            print(f"m3u8 を検出しました: {selected.url}", file=sys.stderr)
+
+    if source is None:
+        raise DiscoveryError("m3u8 の取得元を決定できませんでした")
+
     output = _to_path(_pick(args.output, app_config.output, None))
     if output is None:
         output = Path(datetime.now().strftime("%Y%m%d%H%M%S") + ".mp4")
@@ -377,7 +615,7 @@ def run(args: argparse.Namespace, app_config: AppConfig) -> None:
     playlist_save_path = work_dir / "playlist.m3u8"
 
     playlist, available_playlist = _load_playlist(
-        args.source,
+        source,
         headers=headers,
         timeout=timeout,
         retries=retries,

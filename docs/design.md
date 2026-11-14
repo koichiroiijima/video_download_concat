@@ -80,7 +80,9 @@ cli.main
 │   ├── downloader.py         並列ダウンロード・進捗表示
 │   ├── ffmpeg.py             concat リスト作成・ffmpeg 実行
 │   ├── ffmpeg_bootstrap.py   ffmpeg 探索・自動ダウンロード
-│   └── ffmpeg_sources.py     配布元 URL・SHA256 の定義
+│   ├── ffmpeg_sources.py     配布元 URL・SHA256 の定義
+│   ├── page_source.py        Webページから m3u8 を探索（CLI 未接続）
+│   └── ws.py                 CDP 用の最小 WebSocket クライアント（CLI 未接続）
 └── tests/
     ├── test_cli.py
     ├── test_config.py
@@ -206,6 +208,56 @@ cli.main
 - `select_variant()`: `best` は BANDWIDTH → 解像度の順で最大を選ぶ。数値指定は 0 始まり。
 - `apply_token()`: `EXT-X-TOKEN` をクエリパラメータとして付与する。
 
+### `page_source.py`
+
+- Webページ（HTML・インライン JavaScript・同一オリジンの外部スクリプト・iframe）を
+  静的に走査し、m3u8 URL の候補を抽出する。JavaScript は実行しない。
+- **現時点では CLI から未接続**。`cli.py` は本モジュールを参照していない。
+  JavaScript 実行時の URL 生成に対応する `browser_cdp` も未実装（docstring のみ言及）。
+- `extract_m3u8_urls()`:
+  - `\/`・`\uXXXX`・`\xXX` と HTML エンティティを戻してから走査する。
+  - 絶対 / プロトコル相対、引用符内の相対、ルート相対の 3 種類を正規表現で拾う。
+  - `http://` / `https://` のみ残し、`#fragment` を落として重複排除、出現順を保つ。
+  - 末尾の `),.;]}>` などは URL から除去する。
+- `_Collector`（内部）:
+  - 検出元ラベルは `インラインJS`、`HTML`、`スクリプト: <URL>`。
+  - 外部スクリプトは**同一オリジン**のみ取得する。iframe は `http` / `https` なら辿る。
+  - リソース取得時は `Referer` を親文書の URL に既定設定し、`retries=1` にする。
+  - 上限は文書 5・外部スクリプト 10・候補 50・リソース 2 MiB・iframe 深さ 2。
+- `discover_static()`:
+  - ページを取得し（`max_bytes=2 MiB`）、応答自体が `#EXTM3U` で始まる場合は
+    検出元「ページ自体」として 1 件返す。
+  - それ以外は収集した候補を `probe_candidates()` で検証する。
+  - 候補の検証時は `Referer` を最終ページ URL に既定設定する。
+- `probe_candidates()`:
+  - 候補を実際に取得し（`timeout` は最大 `PROBE_TIMEOUT` = 10 秒、`retries=1`）、
+    BOM・空白を除いた先頭が `#EXTM3U` か確認して `parse_playlist()` に渡す。
+  - 失敗理由は `SourceCandidate.error` に残す。並列数は既定 8
+    （`ThreadPoolExecutor`）。
+- `select_candidate()`:
+  - `index` 指定（想定は `--source-index`）があればそれを採用し、範囲外・取得失敗は
+    `DiscoveryError`。
+  - 有効な候補が 1 件なら自動選択する。
+  - 複数かつ非対話（stdin が TTY でない）なら `DiscoveryError`。
+  - 対話時は候補一覧を stderr に出し、番号入力を最大 3 回受け付ける。
+    空 Enter は最初の有効候補。
+- `format_candidate()`: 一覧表示用に、マスター（Variant 数）/ メディア
+  （セグメント数・合計時間）/ 取得失敗を整形する。
+- `select_candidate()` のエラーメッセージは `--page-mode` / `--source-index` に
+  言及するが、これらは CLI に未実装。CLI へ接続するときに整合させる（TODO）。
+
+### `ws.py`
+
+- Chrome DevTools Protocol に接続するための最小 WebSocket クライアント。
+  標準ライブラリのみで実装する。
+- `ws://` のみ対応（`wss://` は未対応）。
+- HTTP Upgrade でハンドシェイクし、`101` と `Sec-WebSocket-Accept` を検証する。
+- 送信フレームは常にマスクする。受信は分割フレームを結合し、ping には pong を返し、
+  close では `WebSocketError` を送出する。
+- 1 メッセージの上限は 64 MiB、ハンドシェイク応答ヘッダは 64 KiB まで。
+- コンテキストマネージャに対応し、`settimeout()` でソケットのタイムアウトを変更できる。
+- **現時点では CLI から未接続**。
+
 ### `tools/mock-hls-server`
 
 - 開発時のみ使う Node.js 製のテストサーバー。Python の配布物には含めない。
@@ -235,6 +287,9 @@ cli.main
    `playlist.m3u8` を削除（`--keep-segments` を除く）。
    `--save-playlist` で指定したコピー先と、ローカル入力の m3u8 は削除しない。
 
+Webページからの m3u8 自動検出（`page_source.py`）は CLI 未接続のため、
+上記フローには含まれない。
+
 ## 5. 設計上の決定と制約
 
 - **Python 標準ライブラリのみ**で実装し、実行時依存を ffmpeg だけに抑える。
@@ -249,6 +304,11 @@ cli.main
 - **再実行性**を重視し、セグメントは `.part` + atomic rename、既存ファイルは再利用。
 - **安全な後始末**: 作業ディレクトリ全体を消さず、自分が作ったファイルだけ削除する。
 - **LGPL 静的ビルド**を採用し、`-c copy` のみ使うため追加のコーデック依存を持たない。
+- **Webページからの探索は静的解析のみ**（正規表現 + `html.parser`、標準ライブラリ）。
+  JavaScript 実行が必要な場合は CDP を最小 WebSocket 実装（`ws.py`）で扱う方針だが、
+  ブラウザ方式は未実装。
+- **新モジュールは CLI 未接続**。`page_source.py` / `ws.py` は追加済みだが、
+  `cli.py` からの参照・設定ファイル項目・テストはまだ無い。
 
 ## 6. 変更履歴 (主要トピック)
 
@@ -273,3 +333,8 @@ cli.main
 - 2026-11-14: `net.fetch_text()` / `fetch_text_with_url()` に `max_bytes` を追加。
   応答サイズの上限を指定でき、超過時は `DownloadError` にしてリトライしない。
   既定は `None`（上限なし）で、現時点で CLI からの指定はない。
+- 2026-11-14: Webページからの m3u8 探索と WebSocket クライアントを追加（CLI 未接続）。
+  - `page_source.py` — HTML・インライン JS・同一オリジンの外部スクリプト・iframe から
+    m3u8 候補を抽出し、取得してプレイリストか検証。対話選択にも対応。
+  - `ws.py` — CDP 用の最小 WebSocket クライアント（RFC 6455、標準ライブラリのみ）。
+  - `cli.py` からの参照、`browser_cdp.py`、テストは未実装・未追加。
