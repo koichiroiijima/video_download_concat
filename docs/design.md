@@ -99,6 +99,7 @@ cli.main
     ├── test_headers.py
     ├── test_ffmpeg_bootstrap.py
     ├── test_page_source.py
+    ├── test_browser_cdp.py
     ├── test_ws.py
     └── test_e2e.py
 ```
@@ -287,6 +288,14 @@ cli.main
      Edge / Chrome / Chromium、次に `PATH` の `msedge` / `chrome`
   4. Linux: `microsoft-edge` / `microsoft-edge-stable` / `google-chrome` /
      `google-chrome-stable` / `chromium` / `chromium-browser` / `chrome`
+  5. Playwright 同梱の Chromium（`_playwright_browser_path()`）
+     - ルートは `PLAYWRIGHT_BROWSERS_PATH`（`0` 以外）、Windows は
+       `%LOCALAPPDATA%\ms-playwright`、macOS は
+       `~/Library/Caches/ms-playwright`、Linux は `~/.cache/ms-playwright`。
+     - `chromium-<revision>` を新しい順に走査し、OS 別の実行ファイル
+       （Linux: `chrome-linux64/chrome`、Windows: `chrome-win64/chrome.exe`、
+       macOS: `chrome-mac*/Chromium.app/Contents/MacOS/Chromium`）を返す。
+     - `chrome-headless-shell` は `--headless` を受け付けないため対象外。
   - 見つからなければ `BrowserError`（`--browser-path` を案内）。
 - `BrowserSession`:
   - `--user-data-dir` 未指定なら一時ディレクトリを作り、終了時に削除する。
@@ -443,3 +452,9 @@ cli.main
   - `extract_m3u8_urls()` が展開結果も走査するように変更。
     `--page-mode static` でも定番の packer で隠された m3u8 を見つけられる。
   - `tests/test_page_source.py` に packer の展開・URL 抽出・往復のテストを追加。
+- 2026-11-14: `find_browser()` が Playwright 同梱の Chromium を自動検出。
+  - `_playwright_browsers_roots()` / `_playwright_chromium_relative_paths()` /
+    `_playwright_revision()` / `_playwright_browser_path()` を追加。
+  - 探索先は `PLAYWRIGHT_BROWSERS_PATH`（`0` 以外）と OS 標準のキャッシュ。
+    `chromium-<revision>` を新しい順に見て、OS 別の実行ファイルを返す。
+  - `tests/test_browser_cdp.py` に検出・優先順位・未検出のテストを追加。

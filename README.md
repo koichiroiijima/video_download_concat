@@ -272,7 +272,7 @@ auto_download = false
 | 症状 | 確認すること |
 | --- | --- |
 | `HTTP 403 Forbidden` | Referer が配信元のページと一致しているか確認してください。`-H "Referer: ..."` または `[http] referer` で指定します。`User-Agent` や `Accept` が必要な場合もあります。Cloudflare などのボット対策が有効な配信元では、Referer を付けても取得できないことがあります。 |
-| `Chrome / Edge / Chromium が見つかりません` | `--browser-path` で実行パスを指定するか、ブラウザをインストールしてください。 |
+| `Chrome / Edge / Chromium（または Playwright の Chromium）が見つかりません` | `--browser-path` で実行パスを指定するか、ブラウザをインストールしてください。`npx playwright install chromium` で導入した Playwright の Chromium は自動検出されます。 |
 | ページから m3u8 が見つからない | `--list-candidates` で候補を確認してください。`--page-mode browser`、`--headed`、`--click-selector` も試してください。 |
 | 候補が複数ある | `--source-index` で番号を指定してください（`--list-candidates` で番号を確認できます）。 |
 | `EXT-X-TOKEN` の警告が出る | `--token-query NAME` または `--token-header NAME` で付与方法を指定してください。付与方法は配信元ごとに異なります。 |
@@ -289,7 +289,8 @@ auto_download = false
 - Python 3.10 以上
 - [uv](https://docs.astral.sh/uv/)
 - ffmpeg（ソース実行時は `PATH` 上にあるか `--ffmpeg` で指定）
-- Chrome / Edge / Chromium（`--from-page` のブラウザ方式を使う場合のみ）
+- Chrome / Edge / Chromium、または Playwright 同梱の Chromium
+  （`--from-page` のブラウザ方式を使う場合のみ。Playwright のものは自動検出）
 - Node.js 18 以上（モック HLS サーバーを使う場合のみ。npm パッケージは不要）
 
 ```bash

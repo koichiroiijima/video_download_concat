@@ -208,6 +208,15 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
     '...'.split('|'),0,{}))` 形式のページで、`--page-mode static`
     （`--from-page`）でも m3u8 を検出できることを確認した。
   - テストを追加して 76 passed。
+- 2026-11-14: `find_browser()` が Playwright 同梱の Chromium を自動検出。
+  - `PLAYWRIGHT_BROWSERS_PATH`（`0` 以外）、Windows は
+    `%LOCALAPPDATA%\ms-playwright`、macOS は
+    `~/Library/Caches/ms-playwright`、Linux は `~/.cache/ms-playwright` を探す。
+  - `chromium-<revision>` を新しい順に走査し、OS 別の実行ファイルを返す。
+    `chrome-headless-shell` は対象外（`--headless` 非対応）。
+  - Chrome / Edge / Chromium が無い環境でも `--page-mode browser` を
+    `--browser-path` なしで使えるようになった。
+  - `tests/test_browser_cdp.py` を追加（83 passed）。
 
 ## 6. 既知の制約・注意点
 

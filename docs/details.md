@@ -117,8 +117,14 @@ video-concat --from-page https://example.com/watch/123 --source-index 1
     `User-Agent` も控え、`--user-agent` や設定ファイルで明示していなければ
     ブラウザの値を使います（既定値より優先）。
 - ブラウザの探索順: `--browser-path` → 環境変数 `VIDEO_CONCAT_BROWSER` →
-  OS の既定インストール先 / `PATH`。Linux は `microsoft-edge` / `google-chrome` /
-  `chromium` など、Windows は Edge / Chrome / Chromium の標準的な場所を見ます。
+  OS の既定インストール先 / `PATH` → Playwright 同梱の Chromium。
+  Linux は `microsoft-edge` / `google-chrome` / `chromium` など、Windows は
+  Edge / Chrome / Chromium の標準的な場所を見ます。
+- Playwright 同梱の Chromium は、`PLAYWRIGHT_BROWSERS_PATH`（`0` 以外）、
+  Windows は `%LOCALAPPDATA%\ms-playwright`、macOS は
+  `~/Library/Caches/ms-playwright`、Linux は `~/.cache/ms-playwright` から
+  自動で探します。`npx playwright install chromium` 済みなら
+  `--browser-path` なしでブラウザ方式を使えます。
 - `--user-data-dir` にログイン済みプロファイルを指定すると、認証が必要なページも
   開ける場合があります（普段使いのプロファイルを汚さないよう注意）。
 - `--headed` は画面表示ありで起動します。原因調査用です。
@@ -249,7 +255,7 @@ Referer は m3u8 本体、マスターの子プレイリスト、すべてのセ
 | 候補が複数・非対話 | `m3u8 の候補が複数あります。--source-index で番号を指定してください（0〜N-1）` |
 | `--source-index` が範囲外 | `--source-index が範囲外です（候補は N 件、0 始まり）` |
 | 候補がプレイリストとして取得できない | `候補 N は取得できませんでした: ...` / `m3u8 の候補は見つかりましたが、プレイリストとして取得できませんでした。` |
-| ブラウザが見つからない | `Chrome / Edge / Chromium が見つかりません。...--browser-path...` |
+| ブラウザが見つからない | `Chrome / Edge / Chromium（または Playwright の Chromium）が見つかりません。...--browser-path...` |
 | ブラウザ方式の失敗（`--page-mode browser`） | `ブラウザ方式で m3u8 を探索できませんでした: ...` |
 | `auto` で静的解析・ブラウザとも失敗 | `Webページから m3u8 を検出できませんでした。ブラウザ方式も利用できません: ...` |
 | ページの取得に失敗 | `Webページを取得できませんでした: ...` |
@@ -288,6 +294,7 @@ uv run pytest
 | `tests/test_ffmpeg_bootstrap.py` | ffmpeg 探索、tar.xz / zip 展開、SHA256、既存ファイル |
 | `tests/test_cli.py` | 引数なしヘルプ、バージョン、設定エラー、`--from-page` の引数検証 |
 | `tests/test_page_source.py` | m3u8 URL 抽出、静的探索、iframe / 外部スクリプト、候補選択、packer の展開 |
+| `tests/test_browser_cdp.py` | ブラウザ探索（Playwright 同梱 Chromium の検出、優先順位） |
 | `tests/test_ws.py` | WebSocket のハンドシェイク、分割フレーム、ping/pong、マスク |
 | `tests/test_e2e.py` | 合成 TS、HTTP 配信、Referer、ffmpeg 結合、ページ探索 |
 

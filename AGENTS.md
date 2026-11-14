@@ -95,6 +95,8 @@ PY
   静的解析は Dean Edwards の packer（`eval(function(p,a,c,k,e,d){...})`）を
   `decode_obfuscated_javascript()` で展開してから URL を探す。
   ブラウザは利用者環境の Chrome / Edge / Chromium を CDP で操作する。
+  Playwright 同梱の Chromium（`~/.cache/ms-playwright` など）も
+  `find_browser()` が自動検出する。
 - ブラウザ方式の WebSocket は `ws.py`（標準ライブラリのみ）。`wss://` は未対応。
 - ブラウザ方式の E2E は `tests/test_e2e.py` にあり、ヘッドレスブラウザが見つかる
   環境でのみ実行する（無ければスキップ）。CI で回す場合はブラウザの導入が必要。

@@ -1,8 +1,8 @@
 """Chrome / Edge を CDP で操作して m3u8 の通信を検出する。
 
 Python の実行時依存を増やさないため、WebSocket クライアントは
-``ws.py`` の標準ライブラリ実装を使う。ブラウザ本体（Edge / Chrome /
-Chromium）は利用者環境のものを起動する。
+``ws.py`` の標準ライブラリ実装を使う。ブラウザ本体は利用者環境の
+Edge / Chrome / Chromium、または Playwright 同梱の Chromium を起動する。
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -86,6 +87,91 @@ class CdpError(RuntimeError):
     """CDP コマンドが失敗したときに送出する。"""
 
 
+# Playwright が ``npx playwright install`` で配置する Chromium の
+# バージョンディレクトリ（``chromium-<revision>``）配下の実行ファイル。
+# ``chrome-headless-shell`` は ``--headless`` を受け付けないため対象外。
+_PLAYWRIGHT_CHROMIUM_PATHS = {
+    "windows": (
+        Path("chrome-win64") / "chrome.exe",
+        Path("chrome-win") / "chrome.exe",
+        Path("chrome-win32") / "chrome.exe",
+    ),
+    "macos": (
+        Path("chrome-mac") / "Chromium.app" / "Contents" / "MacOS" / "Chromium",
+        Path("chrome-mac-arm64")
+        / "Chromium.app"
+        / "Contents"
+        / "MacOS"
+        / "Chromium",
+        Path("chrome-mac-x64") / "Chromium.app" / "Contents" / "MacOS" / "Chromium",
+    ),
+    "linux": (
+        Path("chrome-linux64") / "chrome",
+        Path("chrome-linux") / "chrome",
+    ),
+}
+
+
+def _playwright_browsers_roots() -> list[Path]:
+    """Playwright のブラウザ配置ディレクトリの候補を返す。"""
+    roots: list[Path] = []
+    env = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if env and env != "0":
+        roots.append(Path(env).expanduser())
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            roots.append(Path(local_app_data) / "ms-playwright")
+    elif sys.platform == "darwin":
+        roots.append(Path.home() / "Library" / "Caches" / "ms-playwright")
+    else:
+        roots.append(Path.home() / ".cache" / "ms-playwright")
+    return roots
+
+
+def _playwright_chromium_relative_paths() -> tuple[Path, ...]:
+    """現在の OS で使う Playwright Chromium の相対パスを返す。"""
+    if os.name == "nt":
+        return _PLAYWRIGHT_CHROMIUM_PATHS["windows"]
+    if sys.platform == "darwin":
+        return _PLAYWRIGHT_CHROMIUM_PATHS["macos"]
+    return _PLAYWRIGHT_CHROMIUM_PATHS["linux"]
+
+
+def _playwright_revision(name: str) -> int:
+    """``chromium-1248`` のような名前からリビジョン番号を取り出す。"""
+    _, _, suffix = name.rpartition("-")
+    try:
+        return int(suffix)
+    except ValueError:
+        return -1
+
+
+def _playwright_browser_path() -> str | None:
+    """Playwright 同梱の Chromium の実行パスを探す。"""
+    relatives = _playwright_chromium_relative_paths()
+    for root in _playwright_browsers_roots():
+        if not root.is_dir():
+            continue
+        try:
+            directories = [
+                child
+                for child in root.iterdir()
+                if child.is_dir() and child.name.startswith("chromium-")
+            ]
+        except OSError:
+            continue
+        directories.sort(
+            key=lambda path: _playwright_revision(path.name), reverse=True
+        )
+        for directory in directories:
+            for relative in relatives:
+                path = directory / relative
+                if path.is_file():
+                    return str(path)
+    return None
+
+
 def find_browser(explicit: str | Path | None = None) -> str:
     """Edge / Chrome / Chromium の実行パスを探す。"""
     if explicit:
@@ -145,9 +231,15 @@ def find_browser(explicit: str | Path | None = None) -> str:
             if found:
                 return found
 
+    playwright = _playwright_browser_path()
+    if playwright:
+        logger.debug("Playwright の Chromium を使います: %s", playwright)
+        return playwright
+
     raise BrowserError(
-        "Chrome / Edge / Chromium が見つかりません。"
-        "インストールするか --browser-path で実行パスを指定してください。"
+        "Chrome / Edge / Chromium（または Playwright の Chromium）が"
+        "見つかりません。インストールするか --browser-path で実行パスを"
+        "指定してください。"
     )
 
 
