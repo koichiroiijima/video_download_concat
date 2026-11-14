@@ -117,7 +117,9 @@ video-concat.exe --from-page "https://example.com/watch/123" --source-index 1
 - ブラウザ方式には Chrome / Edge / Chromium のいずれかが必要です。
   見つからない場合は `--browser-path` で実行パスを指定してください。
 - 候補が 1 件なら自動で選びます。複数あるときは `--source-index` で指定します。
-  対話端末で実行している場合は番号を入力できます。
+  対話端末で実行している場合は番号を入力できます。何も入力せずに Enter を押すと、
+  ファイル名が `video.m3u8` の候補（無ければ最初の有効な候補）を使います。
+  一覧では既定の候補に `(既定)` が付きます。
 - Referer を明示していない場合は、ページの URL を自動で設定します
   （`-H "Referer: ..."` や `[http] referer` を指定した場合はそちらが優先されます）。
   ログインが必要なページでは `--user-data-dir` にログイン済みのブラウザプロファイルを
@@ -274,7 +276,7 @@ auto_download = false
 | `HTTP 403 Forbidden` | Referer が配信元のページと一致しているか確認してください。`-H "Referer: ..."` または `[http] referer` で指定します。`User-Agent` や `Accept` が必要な場合もあります。Cloudflare などのボット対策が有効な配信元では、Referer を付けても取得できないことがあります。 |
 | `Chrome / Edge / Chromium（または Playwright の Chromium）が見つかりません` | `--browser-path` で実行パスを指定するか、ブラウザをインストールしてください。`npx playwright install chromium` で導入した Playwright の Chromium は自動検出されます。 |
 | ページから m3u8 が見つからない | `--list-candidates` で候補を確認してください。`--page-mode browser`、`--headed`、`--click-selector` も試してください。 |
-| 候補が複数ある | `--source-index` で番号を指定してください（`--list-candidates` で番号を確認できます）。 |
+| 候補が複数ある | `--source-index` で番号を指定してください（`--list-candidates` で番号を確認できます）。対話端末なら空 Enter で既定（`video.m3u8` の候補）を使えます。 |
 | `EXT-X-TOKEN` の警告が出る | `--token-query NAME` または `--token-header NAME` で付与方法を指定してください。付与方法は配信元ごとに異なります。 |
 | セグメントの一部が失敗する | `--retries` を増やす、`--concurrency` を下げる、時間をおいて再実行してください。取得済みのセグメントは再利用されます。 |
 | `ffmpeg が見つかりません` | `--ffmpeg PATH` を指定するか、exe と同じフォルダに ffmpeg を置いてください。ソース実行では自動ダウンロードされません。 |

@@ -267,9 +267,16 @@ cli.main
   - 複数かつ非対話（stdin が TTY でない）なら `DiscoveryError` にして
     `--source-index` を案内する。
   - 対話時は候補一覧を stderr に出し、番号入力を最大 3 回受け付ける。
-    空 Enter は最初の有効候補。選択できなければ `DiscoveryError`。
+    空 Enter は `default_candidate_index()` が返す候補
+    （ファイル名が `video.m3u8` の有効な候補、無ければ最初の有効な候補）。
+    選択できなければ `DiscoveryError`。
+- `default_candidate_index()`: 番号選択の既定値を決める。URL のパス末尾
+  （クエリ・断片を除く）が `video.m3u8` の有効な候補を優先する。
+  配信元ではマスターの `playlist.m3u8` とメディアの `video.m3u8` が
+  並ぶことが多く、メディア側が目的の動画に近いため。
 - `format_candidate()`: 一覧表示用に、マスター（Variant 数）/ メディア
   （セグメント数・合計時間）/ 取得失敗を整形する。`--list-candidates` で使う。
+  `default=True` の候補には `(既定)` を付ける。
 - 候補を選んだあと、`cli.run` が候補に付いたヘッダ（ブラウザが送った
   Referer / Origin / Cookie / User-Agent）を明示指定の無い項目だけマージする。
   `Referer` が無ければページ URL で補う（優先順位は
@@ -359,7 +366,8 @@ cli.main
 2. `--from-page` の場合は Webページから m3u8 の候補を探索する。
    `auto` は静的解析で有効な候補が見つかればそれを採用し、無ければブラウザ方式に
    フォールバックする。候補が 1 件なら自動選択、複数なら `--source-index` か
-   対話で選ぶ。選んだ URL を取得元にし、候補ヘッダを明示指定の無い項目だけ補う。
+   対話で選ぶ（空 Enter の既定は `video.m3u8` の候補）。
+   選んだ URL を取得元にし、候補ヘッダを明示指定の無い項目だけ補う。
    Referer が無ければ最終ページ URL で補う。
    `--list-candidates` は候補を一覧表示して終了する。
 3. 出力名を決定（未指定なら `YYYYmmddHHMMSS.mp4`）。
@@ -458,3 +466,10 @@ cli.main
   - 探索先は `PLAYWRIGHT_BROWSERS_PATH`（`0` 以外）と OS 標準のキャッシュ。
     `chromium-<revision>` を新しい順に見て、OS 別の実行ファイルを返す。
   - `tests/test_browser_cdp.py` に検出・優先順位・未検出のテストを追加。
+- 2026-11-15: `--from-page` の番号選択の既定を `video.m3u8` 優先に変更。
+  - `page_source.default_candidate_index()` を追加。URL のパス末尾（クエリ・
+    断片を除く）が `video.m3u8` の有効な候補を既定にし、無ければ最初の有効な
+    候補にする。マスターの `playlist.m3u8` よりメディアプレイリストを優先する。
+  - `format_candidate()` に `default` 引数を追加し、一覧と
+    `--list-candidates` で既定の候補に `(既定)` を付ける。
+  - `tests/test_page_source.py` に既定値の決定・空 Enter のテストを追加。

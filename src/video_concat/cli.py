@@ -23,6 +23,7 @@ from .net import DEFAULT_USER_AGENT, DownloadError, fetch_text_with_url
 from .page_source import (
     DiscoveryError,
     DiscoveryResult,
+    default_candidate_index,
     discover_static,
     format_candidate,
     select_candidate,
@@ -530,9 +531,19 @@ def _discover_page(
 
 
 def _print_candidates(discovery: DiscoveryResult) -> None:
-    print(f"m3u8 の候補: {len(discovery.candidates)} 件")
-    for index, candidate in enumerate(discovery.candidates):
-        print(format_candidate(index, candidate))
+    candidates = discovery.candidates
+    print(f"m3u8 の候補: {len(candidates)} 件")
+    default_index = (
+        default_candidate_index(candidates) if len(candidates) > 1 else None
+    )
+    for index, candidate in enumerate(candidates):
+        print(
+            format_candidate(
+                index,
+                candidate,
+                default=index == default_index,
+            )
+        )
 
 
 def run(args: argparse.Namespace, app_config: AppConfig) -> None:

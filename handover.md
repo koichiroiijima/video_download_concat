@@ -217,6 +217,14 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
   - Chrome / Edge / Chromium が無い環境でも `--page-mode browser` を
     `--browser-path` なしで使えるようになった。
   - `tests/test_browser_cdp.py` を追加（83 passed）。
+- 2026-11-15: `--from-page` の番号選択の既定を `video.m3u8` 優先に変更。
+  - `page_source.default_candidate_index()` — URL のパス末尾（クエリ・断片を除く）
+    が `video.m3u8` の有効な候補を既定にする。無ければ最初の有効な候補。
+  - `format_candidate(default=True)` で一覧に `(既定)` を表示。
+    `--list-candidates` も同じ表示になる。
+  - 実ページ（`missav.fans`）で `playlist.m3u8`（マスター）と
+    `720p/video.m3u8`（メディア）が並ぶとき、後者が既定になることを確認。
+  - テストを追加して 89 passed。
 
 ## 6. 既知の制約・注意点
 

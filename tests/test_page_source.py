@@ -4,12 +4,14 @@ import threading
 
 import pytest
 
+from video_concat.m3u8 import Playlist
 from video_concat.net import DownloadError
 from video_concat.page_source import (
     CandidateHint,
     DiscoveryError,
     SourceCandidate,
     decode_obfuscated_javascript,
+    default_candidate_index,
     discover_static,
     extract_m3u8_urls,
     probe_candidates,
@@ -316,6 +318,93 @@ def test_select_candidate_multiple_requires_index() -> None:
 def test_select_candidate_no_candidates() -> None:
     with pytest.raises(DiscoveryError, match="検出できませんでした"):
         select_candidate([], interactive=False)
+
+
+def test_default_candidate_prefers_video_m3u8() -> None:
+    master = SourceCandidate(
+        url="https://cdn.example.com/uuid/playlist.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+    media = SourceCandidate(
+        url="https://cdn.example.com/uuid/720p/video.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+
+    assert default_candidate_index([master, media]) == 1
+    assert default_candidate_index([media, master]) == 0
+
+
+def test_default_candidate_ignores_query_string() -> None:
+    media = SourceCandidate(
+        url="https://cdn.example.com/uuid/video.m3u8?token=abc#frag",
+        origin="HTML",
+        playlist=object(),
+    )
+    other = SourceCandidate(
+        url="https://cdn.example.com/uuid/playlist.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+
+    assert default_candidate_index([other, media]) == 1
+
+
+def test_default_candidate_falls_back_to_first_valid() -> None:
+    first = SourceCandidate(
+        url="https://cdn.example.com/a.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+    second = SourceCandidate(
+        url="https://cdn.example.com/b.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+
+    assert default_candidate_index([first, second]) == 0
+
+
+def test_default_candidate_skips_failed_video_m3u8() -> None:
+    failed = SourceCandidate(
+        url="https://cdn.example.com/video.m3u8",
+        origin="HTML",
+        error="404",
+    )
+    master = SourceCandidate(
+        url="https://cdn.example.com/playlist.m3u8",
+        origin="HTML",
+        playlist=object(),
+    )
+
+    assert default_candidate_index([failed, master]) == 1
+
+
+def test_default_candidate_without_valid_candidates() -> None:
+    failed = SourceCandidate(
+        url="https://cdn.example.com/video.m3u8",
+        origin="HTML",
+        error="404",
+    )
+
+    assert default_candidate_index([failed]) is None
+
+
+def test_select_candidate_enter_uses_video_m3u8(monkeypatch) -> None:
+    master = SourceCandidate(
+        url="https://cdn.example.com/uuid/playlist.m3u8",
+        origin="HTML",
+        playlist=Playlist(source="https://cdn.example.com/uuid/playlist.m3u8"),
+    )
+    media = SourceCandidate(
+        url="https://cdn.example.com/uuid/720p/video.m3u8",
+        origin="HTML",
+        playlist=Playlist(source="https://cdn.example.com/uuid/720p/video.m3u8"),
+    )
+    monkeypatch.setattr("builtins.input", lambda: "")
+
+    assert select_candidate([master, media], interactive=True) is media
 
 
 def test_probe_candidates_uses_referer() -> None:

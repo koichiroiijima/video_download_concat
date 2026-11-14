@@ -553,7 +553,12 @@ def _format_duration(seconds: float) -> str:
     return f"{minutes}:{secs:02d}"
 
 
-def format_candidate(index: int, candidate: SourceCandidate) -> str:
+def format_candidate(
+    index: int,
+    candidate: SourceCandidate,
+    *,
+    default: bool = False,
+) -> str:
     """候補を一覧表示用の文字列にする。"""
     if candidate.playlist is None:
         status = f"取得失敗: {candidate.error}"
@@ -564,11 +569,38 @@ def format_candidate(index: int, candidate: SourceCandidate) -> str:
             f"メディア セグメント={len(candidate.playlist.segments)}"
             f" 時間={_format_duration(candidate.playlist.total_duration)}"
         )
+    if default:
+        status += " (既定)"
     return (
         f"  [{index}] {status}\n"
         f"      検出元: {candidate.origin}\n"
         f"      {candidate.url}"
     )
+
+
+def _candidate_filename(url: str) -> str:
+    """URL のパス末尾（ファイル名）を取り出す。クエリや断片は無視する。"""
+    return urlsplit(url).path.rsplit("/", 1)[-1].lower()
+
+
+def default_candidate_index(
+    candidates: list[SourceCandidate],
+) -> int | None:
+    """番号選択の既定値を返す。
+
+    ファイル名が ``video.m3u8`` の候補を優先する（配信元でよく使われる
+    メディアプレイリストで、マスターより目的の動画に近いため）。
+    無ければ最初の有効な候補にする。
+    """
+    valid = [
+        candidate_index
+        for candidate_index, candidate in enumerate(candidates)
+        if candidate.ok
+    ]
+    for candidate_index in valid:
+        if _candidate_filename(candidates[candidate_index].url) == "video.m3u8":
+            return candidate_index
+    return valid[0] if valid else None
 
 
 def select_candidate(
@@ -619,15 +651,16 @@ def select_candidate(
             f"（0〜{len(candidates) - 1}）"
         )
 
-    default_index = next(
-        candidate_index
-        for candidate_index, candidate in enumerate(candidates)
-        if candidate.ok
-    )
+    default_index = default_candidate_index(candidates)
+    assert default_index is not None  # 有効な候補が 2 件以上ある
     print("m3u8 の候補が複数あります。", file=sys.stderr)
     for candidate_index, candidate in enumerate(candidates):
         print(
-            format_candidate(candidate_index, candidate),
+            format_candidate(
+                candidate_index,
+                candidate,
+                default=candidate_index == default_index,
+            ),
             file=sys.stderr,
         )
 
