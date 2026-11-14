@@ -106,6 +106,12 @@ ffmpeg を同梱しない場合:
 ./packaging/build.sh --skip-ffmpeg
 ```
 
+ffmpeg を同梱せず、zip も作らない場合:
+
+```bash
+./packaging/build.sh --skip-ffmpeg --no-zip
+```
+
 ## 5. 配布物の構成
 
 ```text
