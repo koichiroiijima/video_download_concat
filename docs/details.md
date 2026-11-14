@@ -299,7 +299,7 @@ Playwright の Chromium キャッシュ、`PATH` 上の Chrome / Edge / Chromium
 
 ### 実施済みの確認
 
-- `uv run pytest` → 36 passed
+- `uv run pytest` → 67 passed
 - Linux 配布版のビルドと `--help` / 引数なしヘルプ
 - 配布 zip を展開した状態でも E2E を実行し、Referer 送信・結合・後始末を確認
 - 配布 zip が実行ファイルの権限（`0755`）を記録していることを確認
@@ -379,7 +379,9 @@ uv run python -m compileall -q src packaging tests
   `--list-candidates` で確認し、`--source-index` で選ぶ。
 - ブラウザ方式は利用者環境の Chrome / Edge / Chromium に依存する。見つからない場合は
   `--browser-path` か環境変数 `VIDEO_CONCAT_BROWSER` で指定する。
-- ブラウザ方式の自動テストは未追加。CI で回す場合はヘッドレスブラウザの導入が必要。
+- ブラウザ方式の E2E は `tests/test_e2e.py` にあり、ヘッドレスブラウザが見つかる
+  環境でのみ実行する（無ければスキップ）。CI で回す場合はブラウザの導入が必要。
+  `browser_cdp.py` の単体テストはない。
 - ブラウザの一時ユーザーデータディレクトリとログは終了時に削除する。
   `--user-data-dir` を指定した場合は削除しない（利用者のプロファイルを消さない）。
 - ブラウザが送った Cookie をセグメント取得に再利用する。`-v` のログに Cookie を

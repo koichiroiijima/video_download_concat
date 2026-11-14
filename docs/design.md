@@ -403,4 +403,8 @@ cli.main
   - `cli.py` — `--from-page` / `--page-mode` / `--page-wait` / `--list-candidates` /
     `--source-index` / `--browser-path` / `--headed` / `--user-data-dir` /
     `--click-selector` を追加。`auto` は静的解析 → ブラウザの順。
-  - ページ探索の自動テストは未追加。
+  - テストを追加: `tests/test_page_source.py`（静的解析・候補選択）、
+    `tests/test_ws.py`（WebSocket のハンドシェイク・分割フレーム・マスク）、
+    `tests/test_e2e.py`（静的解析の E2E、ブラウザ方式の Cookie / Referer E2E）。
+  - `CdpConnection.pump()` がイベント待ちのタイムアウトを例外にせず、
+    待ち時間の経過として扱うよう修正。
