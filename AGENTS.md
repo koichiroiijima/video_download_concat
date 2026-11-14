@@ -60,8 +60,9 @@ uv run python - <<'PY'
 from pathlib import Path
 from video_concat.m3u8 import parse_playlist
 
-text = Path("video.m3u8").read_text(encoding="utf-8")
-playlist = parse_playlist(text, Path("video.m3u8").resolve().as_uri())
+playlist_path = Path("path/to/video.m3u8")  # 手元の m3u8 に置き換える
+text = playlist_path.read_text(encoding="utf-8")
+playlist = parse_playlist(text, playlist_path.resolve().as_uri())
 print(len(playlist.segments))
 PY
 ```
@@ -95,6 +96,7 @@ PY
 - `vendor/ffmpeg/`（ダウンロードした ffmpeg 本体）
 - `tools/mock-hls-server/media/`（モックサーバー用の生成物）
 - `*.mp4`、`*_segments/`、`list.txt`、`*.part`
+- 実データの m3u8 プレイリスト（`EXT-X-TOKEN` などのトークンを含む場合がある）
 - ルートの `video-concat.ini`（利用者固有の設定。配布用は `packaging/video-concat.ini`）
 - ダウンロードしたセグメント・生成物
 - 秘密情報・API キー・Cookie

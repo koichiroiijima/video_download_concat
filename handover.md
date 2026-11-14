@@ -83,8 +83,9 @@ uv run python - <<'PY'
 from pathlib import Path
 from video_concat.m3u8 import parse_playlist
 
-text = Path("video.m3u8").read_text(encoding="utf-8")
-playlist = parse_playlist(text, Path("video.m3u8").resolve().as_uri())
+playlist_path = Path("path/to/video.m3u8")  # 手元の m3u8 に置き換える
+text = playlist_path.read_text(encoding="utf-8")
+playlist = parse_playlist(text, playlist_path.resolve().as_uri())
 print("segments:", len(playlist.segments))
 print("first:", playlist.segments[0].uri)
 print("last:", playlist.segments[-1].uri)
@@ -122,7 +123,8 @@ uv run pytest tests/test_e2e.py -q
   - 配布版で exe 隣の `video-concat.ini` を読み、Referer が m3u8 と各セグメントに送られることを確認。
   - `ffmpeg` を削除した配布版で自動ダウンロード → 結合まで確認。
   - 読み取り専用フォルダで「書き込み権限がありません」エラーになることを確認。
-  - `video.m3u8` から 1830 セグメントを解析できることを確認。
+  - 実データのサンプル（1830 セグメント）でパーサーを確認。
+    サンプルは現在リポジトリに含めていない。
 - 2026-11-03: ドキュメントを実装に追従（オプション・探索順・zip 展開時の権限・
   ライセンスファイルの生成方法）。
 - 2026-11-11: テスト用モック HLS サーバーを追加。
@@ -137,6 +139,11 @@ uv run pytest tests/test_e2e.py -q
   - ローカル m3u8 と `--base-url` の使い方、`-H` による複数ヘッダ指定を追記。
   - 403 / `EXT-X-TOKEN` / ffmpeg 未検出などのトラブル対処表を追加。
   - ボット対策・Cookie などの認証に関する制限事項を追記。
+- 2026-11-14: モックサーバーの Referer 検査対象外に `/index.html` を追記
+  （`tools/mock-hls-server/README.md` と usage コメント。振る舞いは変更なし）。
+- 2026-11-14: 実データのサンプル `video.m3u8` をリポジトリから削除。
+  - パーサーのスモークテスト例を手元の m3u8 に変更。
+  - 実データのプレイリストは `EXT-X-TOKEN` を含む場合があるためコミットしない方針を明記。
 
 ## 6. 既知の制約・注意点
 
@@ -149,11 +156,17 @@ uv run pytest tests/test_e2e.py -q
   ユーザーデータ領域へのフォールバックはしない方針。
 - 自動ダウンロードする ffmpeg は LGPL 静的ビルド（FFmpeg 8.1.3）。
   `ffmpeg_sources.py` の URL・SHA256 を更新したらライセンス情報も更新する。
-- `video.m3u8` は途中で `#EXT-X-ENDLIST` が重複し、`4000,` という壊れた行と、
-  `video1757`〜`video1759` の欠番、`EXTINF` のない `video1760` を含む。
-  パーサーはこれを警告しつつ 1830 セグメントとして扱う。
-- このサンプルの `video1760` は、直前の `EXT-X-TOKEN`（1 個目）が適用される。
+- 以前リポジトリに含めていた実データのサンプル（1830 セグメント）は、途中で
+  `#EXT-X-ENDLIST` が重複し、`4000,` という壊れた行と、`video1757`〜`video1759` の
+  欠番、`EXTINF` のない `video1760` を含んでいた。パーサーはこのような
+  プレイリストも警告しつつ 1830 セグメントとして扱う。
+- そのサンプルの `video1760` には、直前の `EXT-X-TOKEN`（1 個目）が適用された。
   元のプレイリストが壊れているため、トークンの対応は保証できない。
+- 実データの m3u8 は `EXT-X-TOKEN` などのトークンを含む場合があるためコミットしない。
+  動作確認には `tools/mock-hls-server/` の生成物か、`--save-playlist` で保存した
+  プレイリストを使う。
+- 削除した `video.m3u8` は git 履歴（初期コミット `430bf55`）に残っている。
+  履歴の書き換えは行っていない。
 - `EXT-X-TOKEN` の正しい使い方（クエリ / ヘッダ / Cookie）は配信元によって異なる。
   実データで確認するまでは `--token-query` / `--token-header` を指定して検証すること。
 - Cloudflare などのボット対策が有効な配信元では、Referer やヘッダを指定しても

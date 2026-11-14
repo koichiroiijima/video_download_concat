@@ -47,7 +47,6 @@ cli.main
 ├── requirement.md            要求事項
 ├── pyproject.toml            uv / hatchling / 開発依存の設定
 ├── uv.lock                   uv ロックファイル
-├── video.m3u8                動作確認用のサンプル入力（既存ファイル）
 ├── list.cmd                  旧来の Windows 後処理スクリプト（既存ファイル）
 ├── docs/
 │   ├── design.md             本ファイル
@@ -89,6 +88,10 @@ cli.main
     ├── test_ffmpeg_bootstrap.py
     └── test_e2e.py
 ```
+
+実データの m3u8（`EXT-X-TOKEN` を含むもの）はリポジトリに含めない。
+動作確認には `tools/mock-hls-server/` で生成したプレイリストや、
+`--save-playlist` で保存したプレイリストを使う。
 
 ## 3. 実装詳細
 
@@ -257,3 +260,6 @@ cli.main
 - 2026-11-11: テスト用モック HLS サーバーを追加。
   - `tools/mock-hls-server/server.mjs`（Referer 完全一致検査、403）。
   - `tools/mock-hls-server/generate-media.mjs`（ffmpeg で TS 生成）。
+- 2026-11-14: モックサーバーの Referer 検査対象外に `/index.html` を追記。
+- 2026-11-14: 実データのサンプル `video.m3u8` をリポジトリから削除。
+  スモークテストの例は手元の m3u8 を使う形に変更。
