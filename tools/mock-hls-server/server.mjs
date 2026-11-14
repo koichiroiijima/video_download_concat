@@ -39,7 +39,7 @@ video-concat の動作確認用モック HLS サーバーです。
   node server.mjs --referer https://example.com/ --referer https://example.com/watch/1
 
 Referer の判定は完全一致です。Referer ヘッダーがない場合も 403 になります。
-/ と /health は Referer 検査の対象外です。
+/ と /index.html と /health は Referer 検査の対象外です。
 `;
 
 function fail(message) {

@@ -74,7 +74,7 @@ node tools/mock-hls-server/server.mjs --referer https://example.com/
 
 ### Referer の動作
 
-`--referer` を 1 つ以上指定すると、`/` と `/health` 以外のすべての
+`--referer` を 1 つ以上指定すると、`/`、`/index.html`、`/health` 以外のすべての
 リクエストで Referer を検査します。
 
 | リクエスト | 結果 |
