@@ -334,6 +334,20 @@ uv run video-concat "http://127.0.0.1:8080/master.m3u8" \
 ```
 
 Referer がない場合・一致しない場合は 403 になり、`video-concat` もエラー終了します。
+
+`/player.html` は `<video>` で `/master.m3u8` を読み込む再生ページです。
+`--from-page` の静的解析・ブラウザ方式の手動確認に使えます（Referer 検査の対象外）。
+
+```bash
+uv run video-concat --from-page "http://127.0.0.1:8080/player.html" \
+  --page-mode static \
+  --ffmpeg vendor/ffmpeg/linux-x86_64/ffmpeg \
+  -o /tmp/from-page.mp4
+```
+
+Referer 検査を有効にしている場合は、許可する Referer にページ URL
+（例: `http://127.0.0.1:8080/player.html`）を含めて起動してください。
+
 詳細は [tools/mock-hls-server/README.md](tools/mock-hls-server/README.md) を参照してください。
 
 ## 3. ビルド

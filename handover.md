@@ -26,7 +26,7 @@ Python 不要の配布版（PyInstaller onedir）を追加した。
 | `EXT-X-TOKEN`（クエリ / ヘッダ） | 実装済み |
 | 設定ファイル（Referer ほか） | 実装済み |
 | ffmpeg の同梱探索・初回自動ダウンロード | 実装済み |
-| モック HLS サーバー（HTTP / Referer 検査） | 実装済み・確認済み |
+| モック HLS サーバー（HTTP / Referer 検査 / 再生ページ） | 実装済み・確認済み |
 | Webページからの m3u8 探索（`--from-page`） | 実装済み（静的解析 + ブラウザ） |
 | ブラウザ方式（`browser_cdp.py` / `ws.py`） | 実装済み（E2E はブラウザがある環境のみ） |
 | PyInstaller ビルド（Linux / Windows スクリプト） | 実装済み |
@@ -66,6 +66,7 @@ Windows 11 では PowerShell から:
 ```bash
 node tools/mock-hls-server/generate-media.mjs
 node tools/mock-hls-server/server.mjs --referer https://example.com/
+# 再生ページ: http://127.0.0.1:8080/player.html（--from-page の確認用）
 ```
 
 ## 4. 検証コマンド
@@ -189,6 +190,8 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
     `uv run pytest` は 67 passed（ブラウザ E2E は環境によりスキップ）。
   - `CdpConnection.pump()` がイベント待ちのタイムアウトを例外にしていたため、
     待ち時間の経過として扱うよう修正。ブラウザ E2E はこれで通るようになった。
+  - モック HLS サーバーに `/player.html` を追加。`<video>` で `/master.m3u8` を
+    読み込み、`--from-page` の静的解析・ブラウザ方式を手動で確認できる。
 
 ## 6. 既知の制約・注意点
 
@@ -220,6 +223,7 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
   `--token-header` で対応できる範囲に限られる。
 - モック HLS サーバーは Node.js 18 以上が必要で、開発時のみ使用する。
   生成した `tools/mock-hls-server/media/` はコミットしない。
+  `/player.html` は `--from-page` の確認用で、Referer 検査の対象外。
 - ライブ配信は実行時点のスナップショットのみ。
 - セグメント URL にトークンが含まれる場合、`-v` のログに URL が出る可能性がある。
 - 設定ファイルに Cookie などの秘密情報を書く場合、配布物に含めないよう注意する。
@@ -249,7 +253,8 @@ VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
 - [ ] fMP4（`EXT-X-MAP`）対応が必要か判断する。
 - [ ] ライブ配信の継続取得（ポーリング）が必要か判断する。
 - [ ] `browser_cdp.py` の単体テストを追加する（現状は E2E のみ）。
-- [ ] Windows 11 で `--from-page` のブラウザ方式を確認する（Edge / Chrome）。
+- [ ] Windows 11 で `--from-page` のブラウザ方式を確認する（Edge / Chrome。
+      モックサーバーの `/player.html` を使える）。
 - [ ] 実際の動画ページで `auto` の静的解析 → ブラウザのフォールバックを確認する。
 - [ ] 必要ならページ探索の設定ファイル項目を追加する（現状は CLI のみ）。
 

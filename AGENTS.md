@@ -55,6 +55,7 @@ uv run python packaging/fetch_ffmpeg.py
 # モック HLS サーバー（Node.js 18 以上、npm 依存なし）
 node tools/mock-hls-server/generate-media.mjs
 node tools/mock-hls-server/server.mjs --referer https://example.com/
+# 再生ページ http://127.0.0.1:8080/player.html で --from-page を確認できる
 ```
 
 パーサーのスモークテスト:
@@ -130,6 +131,7 @@ PY
 3. `uv run pytest` と `uv run video-concat --help` で確認する。
 4. 必要なら `packaging/fetch_ffmpeg.py` で ffmpeg を用意し、E2E を実行する。
    モック HLS サーバー（`tools/mock-hls-server/`）でも Referer と 403 を確認できる。
+   `/player.html` を使うと `--from-page` の静的解析・ブラウザ方式も確認できる。
 5. Linux 配布版をビルドして `--help` / 引数なしヘルプ / E2E を確認する。
 6. ドキュメント（README / docs / handover）を実装に追従させる。
 7. 差分を確認しコミットする（push はユーザー確認後）。
