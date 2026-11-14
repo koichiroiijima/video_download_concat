@@ -281,16 +281,21 @@ uv run pytest
 | `tests/test_config.py` | 設定ファイルの読み込み、BOM、`%`、不正値、未知キー |
 | `tests/test_headers.py` | ヘッダ解析、正規化、インジェクション対策 |
 | `tests/test_ffmpeg_bootstrap.py` | ffmpeg 探索、tar.xz / zip 展開、SHA256、既存ファイル |
-| `tests/test_cli.py` | 引数なしヘルプ、バージョン、設定エラー |
-| `tests/test_e2e.py` | 合成 TS、HTTP 配信、Referer、ffmpeg 結合 |
+| `tests/test_cli.py` | 引数なしヘルプ、バージョン、設定エラー、`--from-page` の引数検証 |
+| `tests/test_page_source.py` | m3u8 URL 抽出、静的探索、iframe / 外部スクリプト、候補選択 |
+| `tests/test_ws.py` | WebSocket のハンドシェイク、分割フレーム、ping/pong、マスク |
+| `tests/test_e2e.py` | 合成 TS、HTTP 配信、Referer、ffmpeg 結合、ページ探索 |
 
 E2E は ffmpeg が必要です。`vendor/ffmpeg/linux-x86_64/ffmpeg` があるか、
 `VIDEO_CONCAT_TEST_FFMPEG` でパスを指定するか、`PATH` に ffmpeg を入れてください。
 ない場合はスキップされます。
 
-`page_source.py` / `browser_cdp.py` / `ws.py`（Webページ探索・CDP・WebSocket）は
-テスト未追加です。ブラウザ方式はヘッドレスブラウザに依存するため、手動または
-モックページで確認します。
+ブラウザ方式の E2E はヘッドレスブラウザが必要です。`VIDEO_CONCAT_TEST_BROWSER`、
+Playwright の Chromium キャッシュ、`PATH` 上の Chrome / Edge / Chromium の順に探し、
+見つからない場合はスキップされます。テストでは `/dynamic.html` が
+`Set-Cookie` を返し、JavaScript の `fetch()` で `master.m3u8` を要求します。
+ブラウザが送った Cookie と Referer が m3u8・セグメント取得に再利用されることを
+確認します。
 
 ### 実施済みの確認
 
