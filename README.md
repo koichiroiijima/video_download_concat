@@ -2,6 +2,7 @@
 
 m3u8（HLS）プレイリストを取得し、そこに記載されたセグメントを並列ダウンロードして、
 ffmpeg の concat デマルチプレクサで 1 本の MP4 に結合する CLI です。
+動画ページの URL から m3u8 を自動検出する `--from-page` にも対応しています。
 
 `list.cmd` が手動で行っていた「`.jpeg` → `.ts` リネーム、連番ゼロ埋め、`list.txt` 作成、
 ffmpeg 結合、セグメント削除」をまとめて自動化します。
@@ -64,11 +65,12 @@ video-concat.exe "https://example.com/video.m3u8" --save-playlist playlist.m3u8
 
 ### 実行の流れ
 
-1. m3u8 を取得して解析します。マスタープレイリストの場合は `--variant` で 1 つ選びます
+1. `--from-page` を指定した場合は、Webページから m3u8 の候補を探し、1 つ選びます。
+2. m3u8 を取得して解析します。マスタープレイリストの場合は `--variant` で 1 つ選びます
    （既定は `best`）。
-2. セグメントを並列ダウンロードします（`--concurrency`、既定 8）。
-3. `list.txt` を作成し、ffmpeg の concat デマルチプレクサで 1 本の MP4 に結合します。
-4. 成功すると、セグメント・`list.txt`・`playlist.m3u8` を削除します。
+3. セグメントを並列ダウンロードします（`--concurrency`、既定 8）。
+4. `list.txt` を作成し、ffmpeg の concat デマルチプレクサで 1 本の MP4 に結合します。
+5. 成功すると、セグメント・`list.txt`・`playlist.m3u8` を削除します。
    `--keep-segments` を指定すると残します。
 
 出力 MP4 は一時ファイルに書き出してから置き換えるため、結合に失敗しても
@@ -90,6 +92,39 @@ video-concat.exe "https://example.com/video.m3u8" --save-playlist playlist.m3u8
 - `file://` の URL も指定できます。
 - m3u8 に `EXT-X-TOKEN` が含まれる場合は、`--token-query` / `--token-header` も
   あわせて指定します。
+
+### 動画ページから m3u8 を探す
+
+`--from-page` に動画ページの URL を渡すと、ページの中から m3u8 を探して
+ダウンロードします。
+
+```powershell
+# 見つかった候補を一覧表示（ダウンロードはしません）
+video-concat.exe --from-page "https://example.com/watch/123" --list-candidates
+
+# 候補が 1 件ならそのままダウンロード
+video-concat.exe --from-page "https://example.com/watch/123" -o output.mp4
+
+# 候補が複数あるときは番号で指定（0 始まり）
+video-concat.exe --from-page "https://example.com/watch/123" --source-index 1
+```
+
+- 既定（`--page-mode auto`）は、まずページの HTML・JavaScript・iframe を
+  静的に調べます。見つからない場合は Chrome / Edge / Chromium を起動して
+  実際にページを開き、通信から m3u8 を探します。
+- `--page-mode static` は静的解析だけ、`--page-mode browser` はブラウザだけを
+  使います。
+- ブラウザ方式には Chrome / Edge / Chromium のいずれかが必要です。
+  見つからない場合は `--browser-path` で実行パスを指定してください。
+- 候補が 1 件なら自動で選びます。複数あるときは `--source-index` で指定します。
+  対話端末で実行している場合は番号を入力できます。
+- Referer は自動でページの URL を設定します。ログインが必要なページでは
+  `--user-data-dir` にログイン済みのブラウザプロファイルを指定すると
+  開ける場合があります。
+- 再生ボタンのクリックが必要な場合は `--click-selector` に CSS セレクタを
+  指定します。ブラウザの画面を見ながら確認したいときは `--headed` を使います。
+- `--page-wait` でページを開いてから待つ秒数を変更できます（既定 5 秒）。
+- `--from-page` と `SOURCE` は同時に指定できません。`--base-url` とも併用できません。
 
 ### Referer と追加ヘッダ
 
