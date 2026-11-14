@@ -310,6 +310,10 @@ uv run pytest
 E2E テストは ffmpeg が必要です。`vendor/ffmpeg/linux-x86_64/ffmpeg` があるか、
 `VIDEO_CONCAT_TEST_FFMPEG` でパスを指定するか、`PATH` に ffmpeg を入れてください。
 
+ブラウザ方式の E2E（`--from-page`）は、ヘッドレスブラウザが見つかる環境でのみ
+実行されます。`VIDEO_CONCAT_TEST_BROWSER` で実行パスを指定できます（未指定なら
+Playwright の Chromium キャッシュ、`PATH` 上の Chrome / Edge / Chromium を探します）。
+
 ### モック HLS サーバー
 
 実配信元を使わずに、HTTP ダウンロードと Referer 検査を確認できます。

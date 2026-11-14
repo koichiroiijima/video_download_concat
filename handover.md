@@ -103,6 +103,13 @@ uv run python packaging/fetch_ffmpeg.py
 uv run pytest tests/test_e2e.py -q
 ```
 
+ブラウザ方式の E2E はヘッドレスブラウザが必要です。見つからない場合はスキップされます。
+実行パスは `VIDEO_CONCAT_TEST_BROWSER` で指定できます。
+
+```bash
+VIDEO_CONCAT_TEST_BROWSER=/path/to/chrome uv run pytest tests/test_e2e.py -q
+```
+
 ## 5. 直近の変更履歴
 
 - 2026-11-03: 初版実装。
@@ -180,6 +187,8 @@ uv run pytest tests/test_e2e.py -q
     `tests/test_ws.py`（WebSocket のハンドシェイク・分割フレーム・マスク）、
     `tests/test_e2e.py`（静的解析 E2E、ブラウザ方式の Cookie / Referer E2E）。
     `uv run pytest` は 67 passed（ブラウザ E2E は環境によりスキップ）。
+  - `CdpConnection.pump()` がイベント待ちのタイムアウトを例外にしていたため、
+    待ち時間の経過として扱うよう修正。ブラウザ E2E はこれで通るようになった。
 
 ## 6. 既知の制約・注意点
 
@@ -239,7 +248,7 @@ uv run pytest tests/test_e2e.py -q
 - [ ] AES-128 暗号化 HLS に対応するか判断する（`cryptography` などの依存追加）。
 - [ ] fMP4（`EXT-X-MAP`）対応が必要か判断する。
 - [ ] ライブ配信の継続取得（ポーリング）が必要か判断する。
-- [ ] ページ探索（`page_source.py` / `browser_cdp.py` / `ws.py`）のテストを追加する。
+- [ ] `browser_cdp.py` の単体テストを追加する（現状は E2E のみ）。
 - [ ] Windows 11 で `--from-page` のブラウザ方式を確認する（Edge / Chrome）。
 - [ ] 実際の動画ページで `auto` の静的解析 → ブラウザのフォールバックを確認する。
 - [ ] 必要ならページ探索の設定ファイル項目を追加する（現状は CLI のみ）。
