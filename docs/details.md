@@ -232,6 +232,22 @@ Referer は m3u8 本体、マスターの子プレイリスト、すべてのセ
 | 条件 | 結果 / メッセージ |
 | --- | --- |
 | 引数なし | ヘルプを表示して終了コード 0 |
+| `SOURCE` と `--from-page` の同時指定 | `SOURCE と --from-page は同時に指定できません` |
+| `SOURCE` も `--from-page` も未指定 | `m3u8 の URL（SOURCE）か --from-page のどちらかを指定してください` |
+| `--from-page` が http/https 以外 | `--from-page には http:// / https:// の URL を指定してください` |
+| `--from-page` と `--base-url` の併用 | `--from-page と --base-url は同時に指定できません` |
+| `--list-candidates` / `--source-index` を `--from-page` なしで指定 | `<option> は --from-page と一緒に指定してください` |
+| `--page-mode` の不正値 | `--page-mode には auto / static / browser のいずれかを指定してください` |
+| `--page-mode static` とブラウザ系オプションの併用 | `<option> は --page-mode static と同時に指定できません` |
+| `--page-wait` が負の値 | `--page-wait は 0 以上を指定してください` |
+| ページから候補が見つからない | `Webページから m3u8 の候補を検出できませんでした。...--page-mode browser...` |
+| 候補が複数・非対話 | `m3u8 の候補が複数あります。--source-index で番号を指定してください（0〜N-1）` |
+| `--source-index` が範囲外 | `--source-index が範囲外です（候補は N 件、0 始まり）` |
+| 候補がプレイリストとして取得できない | `候補 N は取得できませんでした: ...` / `m3u8 の候補は見つかりましたが、プレイリストとして取得できませんでした。` |
+| ブラウザが見つからない | `Chrome / Edge / Chromium が見つかりません。...--browser-path...` |
+| ブラウザ方式の失敗（`--page-mode browser`） | `ブラウザ方式で m3u8 を探索できませんでした: ...` |
+| `auto` で静的解析・ブラウザとも失敗 | `Webページから m3u8 を検出できませんでした。ブラウザ方式も利用できません: ...` |
+| ページの取得に失敗 | `Webページを取得できませんでした: ...` |
 | `ffmpeg` が見つからない（自動ダウンロード無効） | 手動配置と `--ffmpeg` を案内して終了コード 1 |
 | `ffmpeg` の自動ダウンロード失敗 | 手動配置と `--ffmpeg` を案内して終了コード 1 |
 | ffmpeg の SHA256 不一致 | `SHA256 が一致しません` を含むエラー |
@@ -272,8 +288,9 @@ E2E は ffmpeg が必要です。`vendor/ffmpeg/linux-x86_64/ffmpeg` がある�
 `VIDEO_CONCAT_TEST_FFMPEG` でパスを指定するか、`PATH` に ffmpeg を入れてください。
 ない場合はスキップされます。
 
-`page_source.py`（Webページからの m3u8 探索）と `ws.py`（WebSocket クライアント）は
-CLI 未接続の段階で、テストはまだありません。
+`page_source.py` / `browser_cdp.py` / `ws.py`（Webページ探索・CDP・WebSocket）は
+テスト未追加です。ブラウザ方式はヘッドレスブラウザに依存するため、手動または
+モックページで確認します。
 
 ### 実施済みの確認
 
@@ -353,10 +370,14 @@ uv run python -m compileall -q src packaging tests
   `packaging/LICENSES/FFmpeg-NOTICE.txt` を更新する。
   `packaging/LICENSES/FFMPEG-BUILD-INFO.txt` はビルド時に自動生成される。
 - Windows では `list.txt` のパスにバックスラッシュを使わない（`/` に正規化する）。
-- Webページからの m3u8 自動検出（`page_source.py`）は CLI 未接続。`--page-mode` /
-  `--source-index` は未実装のため、CLI に接続する際は `select_candidate()` の
-  エラーメッセージとオプション名を一致させる。
-- `page_source.py` の docstring が参照する `browser_cdp`（ブラウザ方式）は未実装。
-  JavaScript の実行が必要なページには未対応。
+- Webページの探索結果は「候補」であり、目的の動画とは限らない。複数候補がある場合は
+  `--list-candidates` で確認し、`--source-index` で選ぶ。
+- ブラウザ方式は利用者環境の Chrome / Edge / Chromium に依存する。見つからない場合は
+  `--browser-path` か環境変数 `VIDEO_CONCAT_BROWSER` で指定する。
+- ブラウザ方式の自動テストは未追加。CI で回す場合はヘッドレスブラウザの導入が必要。
+- ブラウザの一時ユーザーデータディレクトリとログは終了時に削除する。
+  `--user-data-dir` を指定した場合は削除しない（利用者のプロファイルを消さない）。
+- ブラウザが送った Cookie をセグメント取得に再利用する。`-v` のログに Cookie を
+  出さないよう注意する。
 - `ws.py` は `ws://` のみ対応（`wss://` は未対応）。CDP 用途を想定した最小実装で、
   汎用の WebSocket ライブラリではない。

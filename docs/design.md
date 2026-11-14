@@ -358,11 +358,16 @@ cli.main
 - **再実行性**を重視し、セグメントは `.part` + atomic rename、既存ファイルは再利用。
 - **安全な後始末**: 作業ディレクトリ全体を消さず、自分が作ったファイルだけ削除する。
 - **LGPL 静的ビルド**を採用し、`-c copy` のみ使うため追加のコーデック依存を持たない。
-- **Webページからの探索は静的解析のみ**（正規表現 + `html.parser`、標準ライブラリ）。
-  JavaScript 実行が必要な場合は CDP を最小 WebSocket 実装（`ws.py`）で扱う方針だが、
-  ブラウザ方式は未実装。
-- **新モジュールは CLI 未接続**。`page_source.py` / `ws.py` は追加済みだが、
-  `cli.py` からの参照・設定ファイル項目・テストはまだ無い。
+- **Webページからの探索は静的解析 → ブラウザの順**（`auto`）。静的解析は
+  標準ライブラリ（正規表現 + `html.parser`）のみで完結させ、JavaScript の実行が
+  必要なページだけ CDP にフォールバックする。
+- **ブラウザは利用者環境のものを使う**（Chrome / Edge / Chromium）。配布物には
+  同梱せず、Python の実行時依存も増やさない。CDP の WebSocket は `ws.py` の
+  最小実装で扱う。
+- **ブラウザが送ったヘッダを再利用する**。Referer / Origin / Cookie / User-Agent を
+  候補に付け、明示指定が無い項目だけ補う。Referer は最終ページ URL で補う。
+- **ブラウザ方式の自動テストは未追加**。ヘッドレスブラウザ依存になるため、
+  確認は手動またはモックページで行う。
 
 ## 6. 変更履歴 (主要トピック)
 
@@ -387,8 +392,12 @@ cli.main
 - 2026-11-14: `net.fetch_text()` / `fetch_text_with_url()` に `max_bytes` を追加。
   応答サイズの上限を指定でき、超過時は `DownloadError` にしてリトライしない。
   既定は `None`（上限なし）で、現時点で CLI からの指定はない。
-- 2026-11-14: Webページからの m3u8 探索と WebSocket クライアントを追加（CLI 未接続）。
+- 2026-11-14: Webページからの m3u8 探索を追加。
   - `page_source.py` — HTML・インライン JS・同一オリジンの外部スクリプト・iframe から
     m3u8 候補を抽出し、取得してプレイリストか検証。対話選択にも対応。
+  - `browser_cdp.py` — Chrome / Edge / Chromium を CDP で操作し、通信から m3u8 を検出。
   - `ws.py` — CDP 用の最小 WebSocket クライアント（RFC 6455、標準ライブラリのみ）。
-  - `cli.py` からの参照、`browser_cdp.py`、テストは未実装・未追加。
+  - `cli.py` — `--from-page` / `--page-mode` / `--page-wait` / `--list-candidates` /
+    `--source-index` / `--browser-path` / `--headed` / `--user-data-dir` /
+    `--click-selector` を追加。`auto` は静的解析 → ブラウザの順。
+  - ページ探索の自動テストは未追加。
