@@ -149,6 +149,8 @@ uv run pytest tests/test_e2e.py -q
   - モックサーバーの `/` と `/index.html` は使い方の HTML、`/health` は
     `{"ok":true}` を返す。いずれも Referer 検査の対象外。
   - `SOURCE` にはローカルの `.m3u8` だけでなく `file://` URI も指定できる。
+- 2026-11-14: `docs/build.md` に Linux ビルドの `--skip-ffmpeg --no-zip` を追記
+  （実装の変更はなし。`packaging/build.py` は以前から対応済み）。
 
 ## 6. 既知の制約・注意点
 
