@@ -37,6 +37,10 @@ uv run python -m compileall -q src packaging tests
 # ソース実行（ffmpeg のパス指定が必要）
 uv run video-concat "https://example.com/video.m3u8" --ffmpeg /path/to/ffmpeg
 
+# Webページから m3u8 を探す（--list-candidates で候補だけ確認）
+uv run video-concat --from-page "https://example.com/watch/123" --list-candidates
+uv run video-concat --from-page "https://example.com/watch/123" --ffmpeg /path/to/ffmpeg
+
 # ffmpeg を vendor に取得（E2E / ビルド用）
 uv run python packaging/fetch_ffmpeg.py
 
@@ -85,12 +89,13 @@ PY
 - ffmpeg の自動ダウンロードは配布版のみ。ソース実行では `--ffmpeg` / `PATH` を使う。
 - 自動ダウンロードの URL・SHA256 は `ffmpeg_sources.py` に固定する。
   変更時はライセンス情報も更新する。
-- `page_source.py`（Webページからの m3u8 探索）と `ws.py`（CDP 用 WebSocket）は
-  **CLI 未接続**。`--page-mode` / `--source-index` は未実装なので、実装済みとして
-  ドキュメントに書かない。接続時に `select_candidate()` のメッセージと
-  オプション名を揃える。
-- `browser_cdp.py` は未実装。ブラウザ方式を追加するときに `ws.py` を使う。
-- 新モジュールでも実行時依存は増やさない（`ws.py` は標準ライブラリのみ）。
+- `--from-page` の探索は静的解析（`page_source.py`）→ ブラウザ（`browser_cdp.py`）の順。
+  ブラウザは利用者環境の Chrome / Edge / Chromium を CDP で操作する。
+- ブラウザ方式の WebSocket は `ws.py`（標準ライブラリのみ）。`wss://` は未対応。
+- ブラウザ方式の自動テストは未追加。ヘッドレスブラウザ依存のテストを足す場合は
+  CI へのブラウザ導入を検討する。
+- ページ探索のオプションは CLI のみ（設定ファイル項目はない）。追加する場合は
+  `config.py` と `docs/details.md` も更新する。
 - exe フォルダに書き込めない場合はエラーにする（フォールバックしない）。
 - Windows では `list.txt` のパスを `/` に正規化し、UTF-8 / LF で書く。
 - 引数なし実行はヘルプ表示・終了コード 0。
@@ -113,6 +118,7 @@ PY
 - `ffmpeg`（結合・テスト用。配布版は同梱または自動ダウンロード）
 - PyInstaller（配布版ビルド）
 - Node.js 18 以上（モック HLS サーバー用。npm パッケージは不要）
+- Chrome / Edge / Chromium（`--from-page` のブラウザ方式用。利用者環境のもの）
 - スキル: `project-docs`（ドキュメント更新）、`commit`、`test`、`review`、
   `iniit-python-project`、`opencode`、`report`
 
